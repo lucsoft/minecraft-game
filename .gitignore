@@ -1,0 +1,6 @@
+*.jar
+dist
+talos
+.DS_Store
+*.otf
+*.ttf

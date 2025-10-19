@@ -1,0 +1,13 @@
+{
+    "lock": false,
+    "compilerOptions": {
+        "lib": [
+            "deno.window",
+            "dom"
+        ]
+    },
+    "imports": {
+        "@babylonjs/core": "https://esm.sh/@babylonjs/core",
+        "@zip-js/zip-js": "https://esm.sh/jsr/@zip-js/zip-js@^2.8.8"
+    }
+}

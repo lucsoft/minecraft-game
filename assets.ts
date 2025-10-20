@@ -40,10 +40,19 @@ interface MinecraftModel {
         }>
     }[]
 }
-
+interface MinecraftModelVariantModel {
+    model: string;
+    x?: number;
+    y?: number;
+    uvlock?: boolean;
+    weight?: number;
+}
+interface MinecraftBlockstate {
+    variants?: Record<string, MinecraftModelVariantModel[] | MinecraftModelVariantModel>;
+}
 export const minecraftTextures = new Map<string, MinecraftTexture>();
 export const minecraftModels = new Map<string, MinecraftModel>();
-
+export const minecraftBlockstates = new Map<string, MinecraftBlockstate>();
 const mccache = await caches.open("minecraft-cache")
 const minecraft = await (async () => {
     const cachedResponse = await mccache.match("minecraft.jar");
@@ -59,6 +68,7 @@ const minecraftReader = new ZipReader(minecraft.body!);
 const textureLoader = new Set<FileEntry>();
 const animationStatistics = new Map<string,FileEntry>();
 const modulesLoader = new Set<FileEntry>();
+const blockstateLoader = new Set<FileEntry>();
 export const assetState = {
     loaded: false,
     blockItmesAtlasMeta: null as {
@@ -76,13 +86,15 @@ export const assetState = {
 type AtlasCacheData = { rects: typeof assetState[ "blockItmesAtlasMeta" ], data: Uint8Array; width: number, height: number; };
 const cachedModels: RequestInfo = new Request("/minecraft-models-cache-v1");
 const cachedAtlas: RequestInfo = new Request("/minecraft-texture-atlas-v1");
+const cachedBlockstates: RequestInfo = new Request("/minecraft-blockstates-cache-v2");
 export async function loadAssets() {
     console.time("loadAllAssets");
     console.time("loadingCache");
     const cachedModelResponse = await mccache.match(cachedModels);
     const cachedAtlasResponse = await mccache.match(cachedAtlas);
+    const cachedBlockstateResponse = await mccache.match(cachedBlockstates);
     console.timeEnd("loadingCache");
-    if (!cachedAtlasResponse || !cachedModelResponse) {
+    if (!cachedAtlasResponse || !cachedModelResponse || !cachedBlockstateResponse) {
         console.time("loadAssets");
         const files = iteratorToStream(minecraftReader.getEntriesGenerator())
             .pipeThrough(new TransformStream<Entry, FileEntry>({
@@ -93,6 +105,10 @@ export async function loadAssets() {
                     if (entry.filename.startsWith("assets/minecraft/models/")) {
                         if (entry.filename.endsWith(".json"))
                             modulesLoader.add(entry as FileEntry);
+                    }
+                    if (entry.filename.startsWith("assets/minecraft/blockstates/")) {
+                        if (entry.filename.endsWith(".json"))
+                            blockstateLoader.add(entry as FileEntry);
                     }
                     if (entry.filename.startsWith("assets/minecraft/textures/")) {
                         if (entry.filename.endsWith(".png"))
@@ -107,6 +123,24 @@ export async function loadAssets() {
         await Array.fromAsync(files);
         console.timeEnd("loadAssets");
     }
+    console.time("loadBlockstates");
+    if (cachedBlockstateResponse) {
+        const entries = await cachedBlockstateResponse.json() as Record<string, MinecraftModel>;
+        for (const [ key, value ] of Object.entries(entries)) {
+            minecraftBlockstates.set(key, value);
+        }
+    } else {
+        for await (const files of chunk(blockstateLoader, 100)) {
+            const blobs = await Promise.all(files.map(file => file.arrayBuffer().then(buffer => new Response(buffer).json())));
+            for (const [ index, buffer ] of blobs.entries()) {
+                const text = buffer as MinecraftBlockstate;
+                minecraftBlockstates.set(files[index].filename.replace(/assets\/(minecraft)\/blockstates\//, "$1:").replace(".json", ""), text);
+            }
+        }
+        const data = new Response(JSON.stringify(Object.fromEntries(minecraftBlockstates)));
+        await mccache.put(cachedBlockstates, data);
+    }
+    console.timeEnd("loadBlockstates");
     console.time("loadModels");
     if (cachedModelResponse) {
         const entries = await cachedModelResponse.json() as Record<string, MinecraftModel>;
@@ -251,9 +285,9 @@ const getAtlasMetaData = memoize((name: string) => {
     const uvY = y / atlasHeight;
     const uvX2 = (x + uvWidth) / atlasWidth;
     const uvY2 = (y + uvHeigth) / atlasHeight;
-    const baseUV = new BABYLON.Vector4(uvX, uvY, uvX2, uvY2);
+    const atlasUV = new BABYLON.Vector4(uvX, uvY, uvX2, uvY2);
     return {
-        baseUV
+        atlasUV
     };
 });
 
@@ -301,13 +335,34 @@ export const getMinecraftModel = memoize((name: string): BABYLON.Mesh => {
                     return new BABYLON.Vector4(0, 0, 0, 0);
                 }
 
-                const texture = lookupVariable(face.texture, key => resolvedTextures[key as keyof typeof resolvedTextures]);
+                const texture = lookupVariable(face.texture, key => resolvedTextures[ key as keyof typeof resolvedTextures ]);
+                if (typeof texture === "string") {
+                    throw new Error(`Texture ${face.texture} not found for model ${name}`);
+                }
                 if (!texture) {
                     console.log({ name, element, face, minecraftFace, textures });
                 }
-                const { baseUV } = texture as { baseUV: BABYLON.Vector4; };
+                const { atlasUV } = texture;
+
+                if (!face.uv) {
+                    console.error(`Face ${minecraftFace} of model ${name} has no UVs`);
+                    return atlasUV;
+                }
+
                 // Calculate UVs based on face.uv and this baseUV
-                return baseUV;
+                const [ u1, v1, u2, v2 ] = face.uv;
+                const du1 = u1 / 16;
+                const dv1 = v1 / 16;
+                const du2 = u2 / 16;
+                const dv2 = v2 / 16;
+
+                const tileUV = new BABYLON.Vector4(
+                    atlasUV.x + du1 * (atlasUV.z - atlasUV.x),
+                    atlasUV.y + dv1 * (atlasUV.w - atlasUV.y),
+                    atlasUV.x + du2 * (atlasUV.z - atlasUV.x),
+                    atlasUV.y + dv2 * (atlasUV.w - atlasUV.y),
+                );
+                return tileUV;
             })
         });
 

@@ -1,7 +1,7 @@
+import './index.css';
 import * as BABYLON from "https://esm.sh/@babylonjs/core";
 import './assets.ts'
-import { assetState, getMinecraftModel, loadAssets, minecraftModels } from "./assets.ts";
-import './index.css';
+import { assetState, getMinecraftModel, loadAssets, minecraftBlockstates, minecraftModels } from "./assets.ts";
 document.head.innerHTML += `<meta name="color-scheme" content="light dark">`;
 const canvas = document.createElement("canvas");
 document.body.append(canvas);
@@ -20,50 +20,21 @@ loadAssets().then(() => {
     ground.material = material;
     ground.position.y = -1;
 
-    const blocks = minecraftModels.keys().filter(model =>
-        model.startsWith("minecraft:block/")
-        && !model.includes("template_")
-        && !model.startsWith("minecraft:block/crop")
-        && !model.startsWith("minecraft:block/flowerbed")
-        && !model.startsWith("minecraft:block/orientable")
-        && !model.startsWith("minecraft:block/fence")
-        && !model.startsWith("minecraft:block/cube")
-        && !model.startsWith("minecraft:block/button")
-        && !model.startsWith("minecraft:block/door")
-        && !model.startsWith("minecraft:block/custom")
-        && !model.startsWith("minecraft:block/stem_growth")
-        && !model.startsWith("minecraft:block/carpet")
-        && !model.startsWith("minecraft:block/pressure_plate")
-        && !model.startsWith("minecraft:block/cross")
-        && !model.startsWith("minecraft:block/redstone_dust_side_alt")
-        && !model.startsWith("minecraft:block/wall_inventory")
-        && !model.startsWith("minecraft:block/tinted_flower_pot_cross")
-        && !model.startsWith("minecraft:block/flower_pot_cross")
-        && !model.startsWith("minecraft:block/rail_curved")
-        && !model.startsWith("minecraft:block/sniffer_egg")
-        && !model.startsWith("minecraft:block/outer_stairs")
-        && !model.startsWith("minecraft:block/coral_wall_fan")
-        && !model.startsWith("minecraft:block/coral_fan")
-        && !model.startsWith("minecraft:block/leaves")
-        && !model.startsWith("minecraft:block/pointed_dripstone")
-        && !model.startsWith("minecraft:block/piston_extended")
-        && !model.startsWith("minecraft:block/slab")
-        && !model.startsWith("minecraft:block/rail_flat")
-        && !model.startsWith("minecraft:block/stairs")
-        && !model.startsWith("minecraft:block/inner_stairs")
-        && !model.startsWith("minecraft:block/tinted_cross")
-        && !model.startsWith("minecraft:block/redstone_dust_side")
-        && !model.startsWith("minecraft:block/stem_fruit")
-    ).take(10 * 20).toArray();
+    const blockStates = minecraftBlockstates.entries()
+        .filter(([ key, value ]) => value.variants !== undefined && value.variants[ "" ])
+        .map(([ key, value ]) => Array.isArray(value.variants![ ""]) ? value.variants![ ""][0].model : value.variants![ ""].model);
 
-    const rowLimit = 15;
-    blocks.entries().forEach(([ index, modelName ]) => {
+    const rowLimit = 25;
+    blockStates.filter(item =>
+        !item.startsWith("minecraft:block/heavy_core")
+    ).toArray().toSorted().entries().forEach(([ index, modelName ]) => {
         const x = index % rowLimit;
         const z = Math.floor(index / rowLimit);
         asyncMaterials.add({ model: modelName, position: new BABYLON.Vector3(x + x + 1, 0,  z + z - 3) });
-        // asyncMaterials.add({ model: "block/stone", position: new BABYLON.Vector3(x + x + 1, -1, z + z - 3) });
+        asyncMaterials.add({ model: "block/stone", position: new BABYLON.Vector3(x + x + 1, -1, z + z - 3) });
     });
 });
+
 
 const camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 20, new BABYLON.Vector3(0, 0, 0), scene);
 camera.attachControl(canvas, true);
@@ -84,5 +55,9 @@ engine.runRenderLoop(() => {
 });
 
 addEventListener("resize", () => {
+    engine.resize();
+});
+
+addEventListener("DOMContentLoaded", () => {
     engine.resize();
 });

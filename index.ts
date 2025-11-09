@@ -2,12 +2,12 @@ import './css.ts'
 import * as BABYLON from "https://esm.sh/@babylonjs/core";
 import './assets.ts'
 import { assetState, getMinecraftModel, loadAssets, minecraftBlockstates, minecraftModels } from "./assets.ts";
+import { asyncMaterials, blockBorder, range, renderChunk } from "./utils.ts";
 document.head.innerHTML += `<meta name="color-scheme" content="light dark">`;
 const canvas = document.createElement("canvas");
 document.body.append(canvas);
 const engine = new BABYLON.WebGPUEngine(canvas, { antialias: true, adaptToDeviceRatio: true });
 await engine.initAsync();
-const asyncMaterials = new Set<{ model: string, position: BABYLON.Vector3 }>();
 const scene = new BABYLON.Scene(engine);
 loadAssets().then(() => {
     const ground = BABYLON.CreateGround("ground", { width: 30, height: 30 }, scene);
@@ -21,8 +21,8 @@ loadAssets().then(() => {
     ground.position.y = -1;
 
     const blockStates = minecraftBlockstates.entries()
-        .filter(([ key, value ]) => value.variants !== undefined && value.variants[ "" ])
-        .map(([ key, value ]) => Array.isArray(value.variants![ ""]) ? value.variants![ ""][0].model : value.variants![ ""].model);
+        .filter(([ _, value ]) => value.variants !== undefined && value.variants[ "" ])
+        .map(([ _, value ]) => Array.isArray(value.variants![ ""]) ? value.variants![ ""][0].model : value.variants![ ""].model);
 
     const rowLimit = 25;
     blockStates.filter(item =>
@@ -34,25 +34,14 @@ loadAssets().then(() => {
         asyncMaterials.add({ model: "block/stone", position: new BABYLON.Vector3(x + x + 1, -1, z + z - 3) });
     });
 
-    // A chunk
-    [
-        Array.from({ length: 16 * 16 }, (_, i) => i).map(i => `block/stone`),
-        // now a pyramid on all sides
-        Array.from({ length: 16 * 16 }, (_, i) => {
-            const x = i % 16;
-            const z = Math.floor(i / 16);
-            if (x < 1 || x > 14 || z < 1 || z > 14) {
-                return `block/air`;
-            }
-            return `block/stone`;
-        })
-    ].forEach((layer, y) => {
-        layer.forEach((modelName, index) => {
-            const x = index % 16;
-            const z = Math.floor(index / 16);
-            asyncMaterials.add({ model: modelName, position: new BABYLON.Vector3(x - 20, y, z - 8) });
-        });
-    });
+    renderChunk([
+        ...range(0, 8).map((_, borderRadius) => range(0, 16 * 16)
+            .map((_, i) => blockBorder(i, borderRadius, `block/sandstone`, `block/air`))),
+        ...range(0, 8).map((_, borderRadius) => range(0, 16 * 16)
+            .map((_, i) => blockBorder(i, 7 - borderRadius, `block/deepslate`, `block/air`))),
+        ...range(0, 8).map((_, borderRadius) => range(0, 16 * 16)
+            .map((_, i) => blockBorder(i, borderRadius, `block/cobblestone`, `block/air`))),
+    ], new BABYLON.Vector3(-20, 0, 10));
 });
 
 

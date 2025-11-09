@@ -31,10 +31,17 @@ interface MinecraftModel {
     elements?: {
         from: [ number, number, number ];
         to: [ number, number, number ];
+        rotation?: {
+            origin: [ number, number, number ];
+            axis: "x" | "y" | "z";
+            angle: number;
+            rescale?: boolean;
+        };
         faces: Record<FaceName, {
             uv: [ x1: number, y1: number, x2: number, y2: number ];
             texture: string;
             cullface?: FaceName;
+            // texture rotation in degrees
             rotation?: 0 | 90 | 180 | 270;
             tintindex?: number;
         }>
@@ -125,7 +132,7 @@ export async function loadAssets() {
     }
     console.time("loadBlockstates");
     if (cachedBlockstateResponse) {
-        const entries = await cachedBlockstateResponse.json() as Record<string, MinecraftModel>;
+        const entries = await cachedBlockstateResponse.json() as Record<string, MinecraftBlockstate>;
         for (const [ key, value ] of Object.entries(entries)) {
             minecraftBlockstates.set(key, value);
         }

@@ -1,4 +1,4 @@
-import './index.css';
+import './css.ts'
 import * as BABYLON from "https://esm.sh/@babylonjs/core";
 import './assets.ts'
 import { assetState, getMinecraftModel, loadAssets, minecraftBlockstates, minecraftModels } from "./assets.ts";
@@ -33,6 +33,26 @@ loadAssets().then(() => {
         asyncMaterials.add({ model: modelName, position: new BABYLON.Vector3(x + x + 1, 0,  z + z - 3) });
         asyncMaterials.add({ model: "block/stone", position: new BABYLON.Vector3(x + x + 1, -1, z + z - 3) });
     });
+
+    // A chunk
+    [
+        Array.from({ length: 16 * 16 }, (_, i) => i).map(i => `block/stone`),
+        // now a pyramid on all sides
+        Array.from({ length: 16 * 16 }, (_, i) => {
+            const x = i % 16;
+            const z = Math.floor(i / 16);
+            if (x < 1 || x > 14 || z < 1 || z > 14) {
+                return `block/air`;
+            }
+            return `block/stone`;
+        })
+    ].forEach((layer, y) => {
+        layer.forEach((modelName, index) => {
+            const x = index % 16;
+            const z = Math.floor(index / 16);
+            asyncMaterials.add({ model: modelName, position: new BABYLON.Vector3(x - 20, y, z - 8) });
+        });
+    });
 });
 
 
@@ -40,11 +60,13 @@ const camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5
 camera.attachControl(canvas, true);
 
 new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, -1), scene);
+const ssao = new BABYLON.SSAORenderingPipeline("ssaopipeline", scene, 0.75, [ camera ]);
+ssao.radius = 2;
 
 engine.runRenderLoop(() => {
     scene.render();
     if (assetState.loaded) {
-        if (asyncMaterials.size > 0) {
+        while (asyncMaterials.size > 0) {
             const asyncMaterial = asyncMaterials.values().next().value!;
             asyncMaterials.delete(asyncMaterial);
             const box = getMinecraftModel(asyncMaterial.model).clone();

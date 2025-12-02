@@ -3,7 +3,7 @@ import * as BABYLON from "https://esm.sh/@babylonjs/core";
 import './assets.ts'
 import { assetState, loadAssets, minecraftBlockstates } from "./assets.ts";
 import { asyncMaterials, blockBorder, range, renderChunk } from "./utils.ts";
-import { bakeModel } from "./backing.ts";
+import { bakeModel, isEmptyModel } from "./backing.ts";
 import { memoize } from "https://esm.sh/jsr/@std/cache";
 
 document.head.innerHTML += `<meta name="color-scheme" content="light dark">`;
@@ -14,8 +14,12 @@ await engine.initAsync();
 const scene = new BABYLON.Scene(engine);
 loadAssets().then(() => {
     const blockStates = minecraftBlockstates.entries()
-        .filter(([ _, value ]) => value.variants !== undefined && value.variants[ "" ])
-        .map(([ _, value ]) => Array.isArray(value.variants![ ""]) ? value.variants![ ""][0].model : value.variants![ ""].model);
+        .filter(([ _, value ]) => value.variants !== undefined)
+        .map(([ _, value ]) => {
+            const lookupKey = (key: string) => Array.isArray(value.variants![ key ]) ? value.variants![ key ][ 0 ].model : value.variants![ key ].model
+            return Object.keys(value.variants!).map(k => lookupKey(k))[0];
+        })
+        .filter((modelName) => !isEmptyModel(modelName));
 
     const rowLimit = 25;
     blockStates.toArray().toSorted().entries().forEach(([ index, modelName ]) => {

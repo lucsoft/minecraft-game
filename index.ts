@@ -18,9 +18,7 @@ loadAssets().then(() => {
         .map(([ _, value ]) => Array.isArray(value.variants![ ""]) ? value.variants![ ""][0].model : value.variants![ ""].model);
 
     const rowLimit = 25;
-    blockStates.filter(item =>
-        !item.startsWith("minecraft:block/heavy_core")
-    ).toArray().toSorted().entries().forEach(([ index, modelName ]) => {
+    blockStates.toArray().toSorted().entries().forEach(([ index, modelName ]) => {
         const x = index % rowLimit;
         const z = Math.floor(index / rowLimit);
         asyncMaterials.add({ model: modelName, position: new BABYLON.Vector3(x + x + 1, 0,  z + z - 3) });

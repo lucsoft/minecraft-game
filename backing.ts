@@ -127,7 +127,7 @@ export function bakeModel(externalName: string) {
         for (const faceName of expectedFaces) {
             const face = element.faces[ faceName as keyof typeof element.faces ];
             if (!face) continue;
-            const atlasUV = resolvedTextures[ face.texture.slice(1) ].atlasUV;
+            const atlasUV = resolvedTextures[ face.texture.replace("#", "") ].atlasUV;
             assert(atlasUV != null, `Texture not found for face ${faceName} in element`);
             assert(face != null, `Element is missing face: ${faceName}`);
             let vertices = getFaceVertices(element, faceName);

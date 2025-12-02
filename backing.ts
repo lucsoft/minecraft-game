@@ -59,18 +59,18 @@ function applyRotation(vertices: BABYLON.Vector3[], rotation: Required<Required<
     });
 }
 
-function computeFaceUVAtlasMapped(face: string, faceUV: number[], atlasUV: BABYLON.Vector4, rotation = 0, texWidth = 16, texHeight = 16): number[] {
-    // Normalize face UV
-    const u0 = faceUV[0] / texWidth;
-    const v0 = faceUV[1] / texHeight;
-    const u1 = faceUV[2] / texWidth;
-    const v1 = faceUV[3] / texHeight;
+const topLeftToBottomLeft = (faceUV: number[]): number[] => {
+    return [faceUV[0], 16 - faceUV[3], faceUV[2], 16 - faceUV[1]];
+}
+
+function computeFaceUVAtlasMapped(face: string, faceUV: number[], atlasUV: BABYLON.Vector4, rotation = 0): number[] {
+    const faceUVVec = new BABYLON.Vector4(...topLeftToBottomLeft(faceUV)).scale(1 / 16)
 
     // Map into atlas
-    const au0 = BABYLON.Scalar.Lerp(atlasUV.x, atlasUV.z, u0);
-    const av0 = BABYLON.Scalar.Lerp(atlasUV.y, atlasUV.w, v0);
-    const au1 = BABYLON.Scalar.Lerp(atlasUV.x, atlasUV.z, u1);
-    const av1 = BABYLON.Scalar.Lerp(atlasUV.y, atlasUV.w, v1);
+    const au0 = BABYLON.Scalar.Lerp(atlasUV.x, atlasUV.z, faceUVVec.x);
+    const av0 = BABYLON.Scalar.Lerp(atlasUV.y, atlasUV.w, faceUVVec.y);
+    const au1 = BABYLON.Scalar.Lerp(atlasUV.x, atlasUV.z, faceUVVec.z);
+    const av1 = BABYLON.Scalar.Lerp(atlasUV.y, atlasUV.w, faceUVVec.w);
 
     let uvs: number[];
     switch(face) {

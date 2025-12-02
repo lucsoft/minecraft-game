@@ -1,4 +1,5 @@
 import * as BABYLON from "https://esm.sh/@babylonjs/core";
+import { bakeModel } from "./backing.ts";
 
 export function iteratorToStream<T>(iterator: AsyncIterator<T>) {
   return new ReadableStream<T>({
@@ -15,16 +16,26 @@ export function iteratorToStream<T>(iterator: AsyncIterator<T>) {
   });
 }
 
-export const asyncMaterials = new Set<{ model: string, position: BABYLON.Vector3 }>();
+export const asyncMaterials = new Set<{ model: string, position: BABYLON.Vector3, mesh?: BABYLON.Mesh }>();
 
-export function renderChunk(layers: string[][], offset: BABYLON.Vector3) {
-    layers.forEach((layer, y) => {
-        layer.forEach((modelName, index) => {
+export async function renderChunk(layers: string[][], offset: BABYLON.Vector3, scene: BABYLON.Scene) {
+    const mesh = BABYLON.Mesh.MergeMeshes(layers.flatMap((layer, y) => {
+        return layer.map((modelName, index) => {
             const x = index % 16;
             const z = Math.floor(index / 16);
-            asyncMaterials.add({ model: modelName, position: new BABYLON.Vector3(x + offset.x, y + offset.y, z + offset.z) });
-        });
-    });
+            const mesh = bakeModel(modelName);
+            mesh.position = new BABYLON.Vector3(x, y, z).add(offset);
+            mesh.position.scaleInPlace(16);
+            scene.removeMesh(mesh);
+            if (mesh.name === "emptyModel")
+                return null;
+            return mesh;
+        }).filter((key) => !!key);
+    }), true, true, undefined, false, true)!;
+    scene.removeMesh(mesh);
+    await mesh.optimizeIndicesAsync();
+
+    asyncMaterials.add({ model: "block/air", mesh: mesh, position: offset });
 }
 
 export function blockBorder(index: number, radius: number, insideBlock: string, outsideBlock: string, chunkSize = 16)

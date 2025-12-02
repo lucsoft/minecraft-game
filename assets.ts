@@ -3,8 +3,9 @@ import { Entry, ZipReader, FileEntry } from "@zip-js/zip-js";
 import { iteratorToStream } from "./utils.ts";
 import { chunk, deepMerge } from "https://esm.sh/jsr/@std/collections";
 import { memoize } from "https://esm.sh/jsr/@std/cache";
-import { IRectangle, MaxRectsPacker, Rectangle } from "https://esm.sh/maxrects-packer";
-import { encodeCbor, decodeCbor, CborType } from "https://esm.sh/jsr/@std/cbor";
+import { MaxRectsPacker } from "https://esm.sh/maxrects-packer";
+import { encodeCbor, decodeCbor } from "https://esm.sh/jsr/@std/cbor";
+
 interface MinecraftTexture {
     texture: BABYLON.Texture;
     animation?: {
@@ -17,9 +18,9 @@ interface MinecraftTexture {
 }
 
 type PositionName = "thirdperson_righthand" | "thirdperson_lefthand" | "firstperson_righthand" | "firstperson_lefthand" | "head" | "gui" | "ground" | "fixed" | "on_shelf";
-type FaceName = "down" | "up" | "north" | "south" | "west" | "east";
+export type FaceName = "down" | "up" | "north" | "south" | "west" | "east";
 
-interface MinecraftModel {
+export interface MinecraftModel {
     parent?: string;
     gui_light?: "font" | "side";
     display?: Record<PositionName, {
@@ -54,13 +55,16 @@ interface MinecraftModelVariantModel {
     uvlock?: boolean;
     weight?: number;
 }
-interface MinecraftBlockstate {
+export interface MinecraftBlockstate {
     variants?: Record<string, MinecraftModelVariantModel[] | MinecraftModelVariantModel>;
 }
-export const minecraftTextures = new Map<string, MinecraftTexture>();
 export const minecraftModels = new Map<string, MinecraftModel>();
 export const minecraftBlockstates = new Map<string, MinecraftBlockstate>();
-const mccache = await caches.open("minecraft-cache")
+const currentVersion = 3;
+for (const element of Array.from({ length: currentVersion - 1 }, (_, i) => i + 1)) {
+    await caches.delete("minecraft-cache-v" + element);
+}
+const mccache = await caches.open("minecraft-cache-v" + currentVersion);
 const minecraft = await (async () => {
     const cachedResponse = await mccache.match("minecraft.jar");
     if (cachedResponse)
@@ -93,7 +97,7 @@ export const assetState = {
 type AtlasCacheData = { rects: typeof assetState[ "blockItmesAtlasMeta" ], data: Uint8Array; width: number, height: number; };
 const cachedModels: RequestInfo = new Request("/minecraft-models-cache-v1");
 const cachedAtlas: RequestInfo = new Request("/minecraft-texture-atlas-v1");
-const cachedBlockstates: RequestInfo = new Request("/minecraft-blockstates-cache-v2");
+const cachedBlockstates: RequestInfo = new Request("/minecraft-blockstates-cache-v1");
 export async function loadAssets() {
     console.time("loadAllAssets");
     console.time("loadingCache");
@@ -171,12 +175,12 @@ export async function loadAssets() {
 
     if (cachedAtlasResponse) {
         const cbor = decodeCbor(await cachedAtlasResponse.bytes()) as AtlasCacheData;
-
         const atlas = new BABYLON.RawTexture(cbor.data, cbor.width, cbor.height, BABYLON.Engine.TEXTUREFORMAT_RGBA, null, false, false, BABYLON.Texture.NEAREST_NEAREST_MIPLINEAR);
         atlas.hasAlpha = true;
         assetState.blockItemsAtlas = atlas;
         assetState.blockItmesAtlasMeta = cbor.rects;
     } else {
+        const minecraftTextures = new Map<string, MinecraftTexture>();
         for await (const files of chunk(textureLoader, 100)) {
             const blobs = await Promise.all(files.map(file => file.arrayBuffer()));
             for (const [ index, buffer ] of blobs.entries()) {
@@ -194,7 +198,7 @@ export async function loadAssets() {
                     });
                 minecraftTextures.set(files[ index ].filename.replace(/assets\/(minecraft)\/textures\//, "$1:").replace(".png", ""), {
                     texture,
-                    animation: animationStatistics.has(files[ index ].filename + ".mcmeta") ? await new Response(await animationStatistics.get(files[ index ].filename + ".mcmeta")!.arrayBuffer()).json() : undefined,
+                    ...animationStatistics.has(files[ index ].filename + ".mcmeta") ? await new Response(await animationStatistics.get(files[ index ].filename + ".mcmeta")!.arrayBuffer()).json() : undefined,
                 });
             }
         }
@@ -203,12 +207,12 @@ export async function loadAssets() {
         const targetTextures = /^(.*:)(block|item).*$/;
         const coll = Intl.Collator("en");
 
-        packer.addArray((Array.from(minecraftTextures.entries())).toSorted(([name],[nameB]) => coll.compare(name, nameB)).filter(([name]) => name.match(targetTextures)).map(([ name, { texture, animation } ]) => {
-            const { height, width } = texture.getSize();
+        packer.addArray((Array.from(minecraftTextures.entries())).toSorted(([name],[nameB]) => coll.compare(name, nameB)).filter(([name]) => name.match(targetTextures)).map(([ name, object ]) => {
+            const { height, width } = object.texture.getSize();
             return {
                 width,
                 height,
-                data: { name, texture, animation }
+                data: { name, ...object }
             // deno-lint-ignore no-explicit-any
             } as any;
         }));
@@ -233,9 +237,9 @@ export async function loadAssets() {
         dyn.hasAlpha = true;
         dyn.update(false);
         assetState.blockItemsAtlas = dyn;
-
+        assetState.blockItmesAtlasMeta = bin.rects;
         await mccache.put(cachedAtlas, new Response(new Uint8Array(encodeCbor({
-            rects: bin.rects.map(rect => ({ ...rect, data: { name: rect.data.name, animation: rect.data.animation } })) as typeof assetState["blockItmesAtlasMeta"],
+            rects: bin.rects.map(rect => ({ ...rect, data: { ...rect.data, texture: undefined } })) as typeof assetState["blockItmesAtlasMeta"],
             data: new Uint8Array(await dyn.readPixels() as Uint8Array),
             height: bin.height,
             width: bin.width,
@@ -246,7 +250,7 @@ export async function loadAssets() {
     assetState.loaded = true;
 }
 
-function normalizeName(name: string) {
+export function normalizeName(name: string) {
     return name.startsWith("minecraft:") ? name : `minecraft:${name}`;
 }
 
@@ -267,21 +271,20 @@ export const getMinecraftMaterialFromName = memoize((path: string) => {
     const material = new BABYLON.StandardMaterial(normalizeName(path));
     material.diffuseTexture = assetState.blockItemsAtlas!;
     material.useAlphaFromDiffuseTexture = true;
+    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHATESTANDBLEND;
+    material.forceDepthWrite = true;
     return material;
 });
 
-const mapBabylonToMinecraft = {
-    "up": "up",
-    "down": "down",
-    "left": "west",
-    "right": "east",
-    "front": "south",
-    "back": "north"
-} as const;
-const faceOrder = ["front", "back", "right", "left", "up", "down"];
+export interface AtlasMetaData
+{
+    name: string;
+    atlasUV: BABYLON.Vector4;
+    animationKeys?: number;
+    animation?: MinecraftTexture["animation"];
+}
 
-
-const getAtlasMetaData = memoize((name: string) => {
+export const getAtlasMetaData = memoize((name: string) => {
     if (!assetState.blockItmesAtlasMeta) throw new Error("Atlas not loaded yet");
     const meta = assetState.blockItmesAtlasMeta.find(meta => meta.data.name === normalizeName(name));
     if (!meta) throw new Error(`Texture ${name} not found in atlas`);
@@ -294,95 +297,9 @@ const getAtlasMetaData = memoize((name: string) => {
     const uvY2 = (y + uvHeigth) / atlasHeight;
     const atlasUV = new BABYLON.Vector4(uvX, uvY, uvX2, uvY2);
     return {
-        atlasUV
+        name,
+        atlasUV,
+        animationKeys: meta.data.animation ? uvHeigth / uvWidth : undefined,
+        animation: meta.data.animation,
     };
-});
-
-export const getMinecraftModel = memoize((name: string): BABYLON.Mesh => {
-    const realName = normalizeName(name);
-    const { elements, textures } = getMinecraftModelInfo(realName);
-
-    if (!elements) {
-        return new BABYLON.Mesh(realName);
-    }
-    if (!textures) {
-        throw new Error(`Model ${realName} has no textures`);
-    }
-
-    function lookupVariable<T>(value: string, lookup: (value: string) => string | T) {
-        if (value?.startsWith("#")) {
-            const result = lookup(value.slice(1));
-            if (typeof result === "string")
-                return lookupVariable(result, lookup);
-            return result;
-        }
-        return value;
-    }
-    const resolvedTextures = Object.fromEntries(Object.entries(textures).map(([ key, value ]) => {
-        return [ key, getAtlasMetaData(lookupVariable(value, key => textures[key]) ?? (() => { throw new Error(`Texture ${value} not found for model ${name}`); })() ) ];
-    }));
-
-    const block = BABYLON.Mesh.MergeMeshes(elements.map(element => {
-        const [fx, fy, fz] = element.from;
-        const [tx, ty, tz] = element.to;
-
-        const width  = tx - fx;
-        const height = ty - fy;
-        const depth = tz - fz;
-        const box = BABYLON.MeshBuilder.CreateBox(realName, {
-            width: width / 16,
-            height: height / 16,
-            depth: depth / 16,
-            wrap: true,
-            faceUV: faceOrder.map((babylonFace): BABYLON.Vector4 => {
-                const minecraftFace = mapBabylonToMinecraft[ babylonFace as keyof typeof mapBabylonToMinecraft ];
-                const face = element.faces[ minecraftFace ];
-                if (!face) {
-                    // TODO: Handle missing face (e.g. cullface)
-                    return new BABYLON.Vector4(0, 0, 0, 0);
-                }
-
-                const texture = lookupVariable(face.texture, key => resolvedTextures[ key as keyof typeof resolvedTextures ]);
-                if (typeof texture === "string") {
-                    throw new Error(`Texture ${face.texture} not found for model ${name}`);
-                }
-                if (!texture) {
-                    console.log({ name, element, face, minecraftFace, textures });
-                }
-                const { atlasUV } = texture;
-
-                if (!face.uv) {
-                    console.error(`Face ${minecraftFace} of model ${name} has no UVs`);
-                    return atlasUV;
-                }
-
-                // Calculate UVs based on face.uv and this baseUV
-                const [ u1, v1, u2, v2 ] = face.uv;
-                const du1 = u1 / 16;
-                const dv1 = v1 / 16;
-                const du2 = u2 / 16;
-                const dv2 = v2 / 16;
-
-                const tileUV = new BABYLON.Vector4(
-                    atlasUV.x + du1 * (atlasUV.z - atlasUV.x),
-                    atlasUV.y + dv1 * (atlasUV.w - atlasUV.y),
-                    atlasUV.x + du2 * (atlasUV.z - atlasUV.x),
-                    atlasUV.y + dv2 * (atlasUV.w - atlasUV.y),
-                );
-                return tileUV;
-            })
-        });
-
-        box.position.set(
-            (fx + width / 2) / 16,
-            (fy + height / 2) / 16,
-            (fz + depth / 2) / 16
-        );
-
-        box.material = getMinecraftMaterialFromName(realName);
-        return box;
-    }), undefined, true, undefined, undefined, true)!;
-
-    block.visibility = 0;
-    return block;
 });

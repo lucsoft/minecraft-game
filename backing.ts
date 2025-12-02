@@ -104,6 +104,16 @@ function rotateFaceUVs(uvs: number[], rotation: number): number[] {
     return rotatedQuad.flat();
 }
 
+export function resolveTextureVariables(texture: string, textures: Record<string, string>) {
+    if (texture.startsWith("#")) {
+        const key = texture.slice(1);
+        const resolved = textures[key];
+        assert(resolved != null, `Texture variable not found: ${key}`);
+        return resolveTextureVariables(resolved, textures);
+    }
+    return texture;
+}
+
 export function bakeModel(externalName: string) {
     const realName = normalizeName(externalName);
     const model = getMinecraftModelInfo(realName);
@@ -112,9 +122,8 @@ export function bakeModel(externalName: string) {
     if (!model.elements || !model.textures)
         return new BABYLON.Mesh("emptyModel");
 
-    const textureList = Object.entries(model.textures);
-    const realTextureMappings: Record<string, AtlasMetaData> = Object.fromEntries(textureList.filter(([ key, value ]) => !value.startsWith("#")).map(([ key, value ]) => [ key, getAtlasMetaData(value) ]))
-    const resolvedTextures: Record<string, AtlasMetaData> = Object.fromEntries(textureList.map(([ key, value ]) => [ key, value.startsWith("#") ? realTextureMappings[ value.slice(1) ] : getAtlasMetaData(value) ]));
+    const textureList = Object.entries(model.textures).map(([ key, value ]) => [key, resolveTextureVariables(value, model.textures ?? {})]);
+    const resolvedTextures: Record<string, AtlasMetaData> = Object.fromEntries(textureList.map(([ key, value ]) => [ key, getAtlasMetaData(value) ]));
 
     const meshes: BABYLON.Mesh[] = [];
 
@@ -127,8 +136,8 @@ export function bakeModel(externalName: string) {
         for (const faceName of expectedFaces) {
             const face = element.faces[ faceName as keyof typeof element.faces ];
             if (!face) continue;
-            const atlasUV = resolvedTextures[ face.texture.replace("#", "") ].atlasUV;
-            assert(atlasUV != null, `Texture not found for face ${faceName} in element`);
+            const atlasUV = resolvedTextures[ face.texture.replace("#", "") ]?.atlasUV;
+            assert(atlasUV != null, `Texture not found for face ${faceName} in element ${realName}`);
             assert(face != null, `Element is missing face: ${faceName}`);
             let vertices = getFaceVertices(element, faceName);
             if (element.rotation)
@@ -165,4 +174,11 @@ export function bakeModel(externalName: string) {
     const parentMesh = BABYLON.Mesh.MergeMeshes(meshes, undefined, true, undefined, undefined, true)!;
 
     return parentMesh;
+}
+
+export function isEmptyModel(name: string) {
+    const model = getMinecraftModelInfo(normalizeName(name));
+    if (!model || !model.elements) return true;
+    if (model.elements.length === 0) return true;
+    return false;
 }

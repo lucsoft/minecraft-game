@@ -2,7 +2,7 @@ import * as BABYLON from "@babylonjs/core";
 import { assert } from "@std/assert";
 import './assets.ts';
 import { assetState, getMinecraftMaterialFromName, loadAssets, minecraftBlockstates, normalizeName } from "./assets.ts";
-import { isEmptyModel, isSolidBlock } from "./backing.ts";
+import { isEmptyModel, isSolidBlock } from "./bakeing.ts";
 import { setupCamera, setupCameraInput, tickCamera } from "./camera.ts";
 import { createEntity, setControlledEntity } from "./entities.ts";
 import { createSkyDome, tickSky } from "./sky.ts";

@@ -1,6 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
 import { memoize } from "@std/cache/memoize";
-import { createVertexDataFromModel, emptyModel, solidBlock } from "./backing.ts";
+import { createVertexDataFromModel, emptyModel, solidBlock } from "./bakeing.ts";
 import { Chunk, CHUNK_SIZE, getIndexFromLocalBlock } from "./world.ts";
 
 export function iteratorToStream<T>(iterator: AsyncIterator<T>) {

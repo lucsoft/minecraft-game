@@ -10,5 +10,14 @@ services:
       - cache:/app/cache
     ports:
       - "8000:8000"
+  a-game:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      platforms:
+        - linux/amd64
+    image: ghcr.io/lucsoft/block-game
+    ports:
+      - "5173:80"
 volumes:
   cache:

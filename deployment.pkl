@@ -38,6 +38,26 @@ local assertCdn: Workload = new {
   }
 }
 
+local aGame: Workload = new {
+  name = "a-game"
+
+  spec {
+    containers {
+      new {
+        name = "a-game"
+        image = "ghcr.io/lucsoft/block-game"
+        imagePullPolicy = "Always"
+        ports {
+          new {
+            name = "http"
+            containerPort = 80
+          }
+        }
+      }
+    }
+  }
+}
+
 resources {
   ...assertCdn.resources
   new PersistentVolumeClaim {
@@ -91,6 +111,55 @@ resources {
                 backend {
                   service {
                     name = "asset-cdn"
+                    port {
+                      name = "http"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  ...aGame.resources
+  new Service {
+    metadata {
+      name = "a-game"
+    }
+    spec {
+      selector {
+        ["app.kubernetes.io/name"] = aGame.name
+      }
+      ports {
+        new {
+          name = "http"
+          port = 80
+          targetPort = "http"
+        }
+      }
+    }
+  }
+  new Ingress {
+    metadata {
+      name = "a-game"
+      annotations {
+        ["cert-manager.io/cluster-issuer"] = "lucsoft-allinkl"
+      }
+    }
+    spec {
+      rules {
+        new {
+          host = "block-game.lucsoft.de"
+          http {
+            paths {
+              new {
+                path = "/"
+                pathType = "Prefix"
+                backend {
+                  service {
+                    name = "a-game"
                     port {
                       name = "http"
                     }

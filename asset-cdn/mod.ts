@@ -2,14 +2,16 @@
 import { ZipReader } from "@zip-js/zip-js";
 import { ensureDir, exists } from "jsr:@std/fs";
 import { dirname } from "jsr:@std/path";
-import { encodeCbor  } from "jsr:@std/cbor";
-import { memoize, LruCache, MemoizationCacheResult } from "jsr:@std/cache";
+import { encodeCbor  } from "@std/cbor";
+import { memoize, LruCache, MemoizationCacheResult } from "@std/cache";
 import { NullEngine, Scene } from "@babylonjs/core";
 import { MaxRectsPacker } from "https://esm.sh/maxrects-packer";
 import { createCanvas, Image, loadImage } from "jsr:@gfx/canvas-wasm";
+import { serveFile } from "jsr:@std/http";
 const kv = await Deno.openKv();
 const engine = new NullEngine();
 new Scene(engine);
+const validUrlPattern = /https:\/\/piston-data\.mojang\.com\/v1\/objects\/(?<objectId>.*)\/client\.jar/
 
 async function makeMinecraftAssetCache(objectId: string, stream: ReadableStream<Uint8Array<ArrayBuffer>>)
 {
@@ -74,7 +76,7 @@ async function ensureModels(files: string[], objectId: string) {
 
 async function ensureAtlas(files: string[], objectId: string)
 {
-    const item = await kv.get<true>([ "atlas", "v2", objectId ]);
+    const item = await kv.get<true>([ "atlas", "v3", objectId ]);
     if (item.value) return;
     console.log(`[INFO] Caching atlas for objectId: ${objectId}`);
     const textures = new Map<string, {
@@ -124,38 +126,47 @@ async function ensureAtlas(files: string[], objectId: string)
 
     await Deno.writeFile(`./cache/${objectId}/atlas.cbor`, encodeCbor({
         rects: bin.rects.map(rect => ({ ...rect, data: { ...rect.data, image: undefined } })),
-        data: canvas.toBuffer("image/png"),
+        data: canvas.getRawBuffer(0, 0, bin.width, bin.height),
         width: bin.width,
         height: bin.height,
     }));
     await Deno.writeFile(`./cache/${objectId}/atlas.png`, canvas.toBuffer("image/png"));
     canvas.dispose();
-    await kv.set([ "atlas", "v2", objectId ], true);
+    await kv.set([ "atlas", "v3", objectId ], true);
+}
+
+function respond(rsp: Response) {
+    rsp.headers.set("Access-Control-Allow-Origin", "*");
+    rsp.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    rsp.headers.set("Access-Control-Allow-Headers", "Content-Type");
+    rsp.headers.set("Access-Control-Max-Age", "86400");
+    return rsp;
 }
 
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS")
-        return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Max-Age": "86400" } });
+        return respond(new Response("", { status: 200}));
     console.log(`[INFO] ${req.method} - ${req.url}`);
     const url = new URL(req.url);
-    if (!url.searchParams.has("url")) return new Response("Missing url parameter", { status: 400 });
+    if (!url.searchParams.has("url")) return respond(new Response("Missing url parameter", { status: 400 }));
 
-    const validUrlPattern = /https:\/\/piston-data\.mojang\.com\/v1\/objects\/(?<objectId>.*)\/client\.jar/
     const objectId = url.searchParams.get("url")?.match(validUrlPattern)?.groups?.objectId;
-    if (!objectId) return new Response("Invalid URL", { status: 400 });
-    const files = await fileIndex(objectId);
+    if (!objectId) return respond(new Response("Invalid URL", { status: 400 }));
+
     await ensureCache(objectId, url);
+
+    const files = await fileIndex(objectId);
     await ensureBlockstates(files, objectId);
     await ensureModels(files, objectId);
     await ensureAtlas(files, objectId);
-    if (url.searchParams.has("atlas")) {
-        const atlasData = await Deno.readFile(`./cache/${objectId}/atlas.cbor`);
-        return new Response(atlasData, { headers: { "Content-Type": "application/cbor", "Access-Control-Allow-Origin": "*" } });
-    }
-    return Response.json({
+
+    if (url.searchParams.has("atlas")) return respond(await serveFile(req, `./cache/${objectId}/atlas.cbor`));
+    if (url.searchParams.has("atlaspng")) return respond(await serveFile(req, `./cache/${objectId}/atlas.png`));
+
+    return respond(Response.json({
         objectId,
         files,
         blockstates: await jsonCache([ "blockstates", "v0", objectId ]),
         models: await jsonCache([ "models", "v0", objectId ]),
-    });
+    }));
 })

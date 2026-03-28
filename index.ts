@@ -5,6 +5,7 @@ import { assetState, getMinecraftMaterialFromName, loadAssets, minecraftBlocksta
 import { isEmptyModel, isSolidBlock } from "./backing.ts";
 import { setupCamera, setupCameraInput, tickCamera } from "./camera.ts";
 import { createEntity, setControlledEntity } from "./entities.ts";
+import { createSkyDome, tickSky } from "./sky.ts";
 import { computedChunks, range, rawChunks, renderChunk } from "./utils.ts";
 import { Chunk, CHUNK_SIZE, debugMutateChunk, generateWorld, getIndexFromLocalBlock } from "./world.ts";
 
@@ -36,13 +37,6 @@ const engine = new BABYLON.WebGPUEngine(canvas, { antialias: true, adaptToDevice
 await engine.initAsync();
 const scene = new BABYLON.Scene(engine);
 
-const camera = setupCamera(scene);
-camera.position.y = 100 * 16;
-const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, -1), scene);
-light.groundColor = new BABYLON.Color3(0.3, 0.3, 0.3);
-
-const player = createEntity(camera.position);
-setControlledEntity(player.id);
 const activeChunks: string[] = [];
 const activeRawChunks: string[] = [];
 
@@ -134,6 +128,14 @@ globalThis.state = {
 };
 
 startGame();
+const camera = setupCamera(scene);
+camera.position.y = 100 * 16;
+const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, -1), scene);
+light.groundColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+createSkyDome(scene);
+
+const player = createEntity(camera.position);
+setControlledEntity(player.id);
 setupCameraInput(camera, scene, engine);
 
 engine.runRenderLoop(() => {
@@ -144,6 +146,7 @@ engine.runRenderLoop(() => {
 
     const dt = engine.getDeltaTime() / 1000;
     tickCamera(camera, dt, isBlockSolid);
+    tickSky(dt, scene, light);
 
     const pos = camera.position;
     const bx = Math.floor(pos.x / CHUNK_SIZE);

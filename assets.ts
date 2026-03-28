@@ -76,7 +76,7 @@ type AtlasCacheData = { rects: typeof assetState[ "blockItmesAtlasMeta" ], data:
 
 const minecraftTargetJar = "https://piston-data.mojang.com/v1/objects/d3bdf582a7fa723ce199f3665588dcfe6bf9aca8/client.jar";
 
-const assetPipeline = new URL(`${location.hostname === "localhost" ? "http://localhost:8000" : "https://asset-pipeline.lucsoft.de/"}?${new URLSearchParams({ url: minecraftTargetJar })}`);
+export const assetPipeline = new URL(`${location.hostname === "localhost" ? "http://localhost:8000" : "https://asset-pipeline.lucsoft.de/"}?${new URLSearchParams({ url: minecraftTargetJar })}`);
 
 export async function loadAssets() {
     const requestMetadata = await fetch(assetPipeline);

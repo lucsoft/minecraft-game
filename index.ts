@@ -39,7 +39,7 @@ function updateChunkVertexData() {
     const start = performance.now();
     for (const element of rawChunks) {
         if (activeRawChunks.includes(element.index)) continue;
-        if (performance.now() - start > 5) break;
+        if (performance.now() - start > 10) break;
         computedChunks.add({
             index: element.index, x: element.x, z: element.z,
             chunkData: renderChunk(element.chunk, new BABYLON.Vector3(element.x * 16, -5 * 16, element.z * 16))
@@ -52,7 +52,7 @@ function updateChunkMeshPipeline() {
     const start = performance.now();
     for (const element of computedChunks) {
         if (activeChunks.includes(element.index)) continue;
-        if (performance.now() - start > 5) break;
+        if (performance.now() - start > 10) break;
         const mesh = new BABYLON.Mesh("chunk", null);
         element.chunkData.applyToMesh(mesh);
         mesh.material = getMinecraftMaterialFromName(normalizeName("block/stone"));

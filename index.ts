@@ -1,10 +1,11 @@
 import * as BABYLON from "@babylonjs/core";
 import { memoize } from "@std/cache";
 import './assets.ts';
-import { assetState, loadAssets, minecraftBlockstates } from "./assets.ts";
-import { bakeModel, isEmptyModel } from "./backing.ts";
+import { assetState, loadAssets } from "./assets.ts";
+import { bakeModel } from "./backing.ts";
 import './css.ts';
-import { asyncMaterials, blockBorder, range, renderChunk } from "./utils.ts";
+import { asyncMaterials, range, renderChunk } from "./utils.ts";
+import { generateWorld } from "./world.ts";
 
 document.head.innerHTML += `<meta name="color-scheme" content="light dark">`;
 const canvas = document.createElement("canvas");
@@ -12,31 +13,32 @@ document.body.append(canvas);
 const engine = new BABYLON.WebGPUEngine(canvas, { antialias: true, adaptToDeviceRatio: true });
 await engine.initAsync();
 const scene = new BABYLON.Scene(engine);
-loadAssets().then(() => {
-    const blockStates = minecraftBlockstates.entries()
-        .filter(([ _, value ]) => value.variants !== undefined)
-        .map(([ _, value ]) => {
-            const lookupKey = (key: string) => Array.isArray(value.variants![ key ]) ? value.variants![ key ][ 0 ].model : value.variants![ key ].model;
-            return Object.keys(value.variants!).map(k => lookupKey(k))[ 0 ];
-        })
-        .filter((modelName) => !isEmptyModel(modelName));
+loadAssets().then(async () => {
+    // const blockStates = minecraftBlockstates.entries()
+    //     .filter(([ _, value ]) => value.variants !== undefined)
+    //     .map(([ _, value ]) => {
+    //         const lookupKey = (key: string) => Array.isArray(value.variants![ key ]) ? value.variants![ key ][ 0 ].model : value.variants![ key ].model;
+    //         return Object.keys(value.variants!).map(k => lookupKey(k))[ 0 ];
+    //     })
+    //     .filter((modelName) => !isEmptyModel(modelName));
 
-    const rowLimit = 25;
-    blockStates.toArray().toSorted().entries().forEach(([ index, modelName ]) => {
-        const x = index % rowLimit;
-        const z = Math.floor(index / rowLimit);
-        asyncMaterials.add({ model: modelName, position: new BABYLON.Vector3(x + x + 1, 0, z + z - 3) });
-        asyncMaterials.add({ model: "block/stone", position: new BABYLON.Vector3(x + x + 1, -1, z + z - 3) });
-    });
-
-    renderChunk([
-        ...range(0, 8).map((_, borderRadius) => range(0, 16 * 16)
-            .map((_, i) => blockBorder(i, borderRadius, `block/sandstone`, `block/air`))),
-        ...range(0, 8).map((_, borderRadius) => range(0, 16 * 16)
-            .map((_, i) => blockBorder(i, 7 - borderRadius, `block/deepslate`, `block/air`))),
-        ...range(0, 8).map((_, borderRadius) => range(0, 16 * 16)
-            .map((_, i) => blockBorder(i, borderRadius, `block/cobblestone`, `block/air`))),
-    ], new BABYLON.Vector3(-20, 0, 10), scene);
+    // const rowLimit = 25;
+    // blockStates.toArray().toSorted().entries().forEach(([ index, modelName ]) => {
+    //     const x = index % rowLimit;
+    //     const z = Math.floor(index / rowLimit);
+    //     asyncMaterials.add({ model: modelName, position: new BABYLON.Vector3(x + x + 1, 0, z + z - 3) });
+    //     asyncMaterials.add({ model: "block/stone", position: new BABYLON.Vector3(x + x + 1, -1, z + z - 3) });
+    // });
+    const seed = 5;
+    for (const element of range(0, 3)) {
+        // first generate the world always + 1 in the radius and + 1 in the skip radius
+        const world = generateWorld(seed, element, element - 1);
+        for (const { z, x, layers } of world) {
+            await renderChunk(layers, new BABYLON.Vector3(x * 16, -5 * 16, z * 16), scene);
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        await new Promise(resolve => setTimeout(resolve, 5000));
+    }
 });
 
 
@@ -73,6 +75,10 @@ engine.runRenderLoop(() => {
             }
         }
     }
+});
+
+addEventListener("keydown", (e) => {
+    if (e.key === "t") scene.forceWireframe = !scene.forceWireframe;
 });
 
 addEventListener("click", () => {

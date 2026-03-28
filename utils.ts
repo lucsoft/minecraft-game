@@ -1,5 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
-import { bakeModel, isEmptyModel, isSolidBlock } from "./backing.ts";
+import { getMinecraftMaterialFromName, normalizeName } from "./assets.ts";
+import { createVertexDataFromModel, isEmptyModel, isSolidBlock } from "./backing.ts";
 
 export function iteratorToStream<T>(iterator: AsyncIterator<T>) {
     return new ReadableStream<T>({
@@ -18,7 +19,7 @@ export function iteratorToStream<T>(iterator: AsyncIterator<T>) {
 
 export const asyncMaterials = new Set<{ model: string, position: BABYLON.Vector3, mesh?: BABYLON.Mesh; }>();
 
-export function renderChunk(layers: string[][], offset: BABYLON.Vector3, scene: BABYLON.Scene) {
+export async function renderChunk(layers: string[][], offset: BABYLON.Vector3, scene: BABYLON.Scene) {
     const layerSize = 16;
 
     const solidLayers = layers.map(layer => layer.every(block => isSolidBlock(block)));
@@ -45,17 +46,21 @@ export function renderChunk(layers: string[][], offset: BABYLON.Vector3, scene: 
             if (isOpaque(x - 1, y, z)) hidden.add("west");
             if (isOpaque(x + 1, y, z)) hidden.add("east");
 
-            const mesh = bakeModel(modelName, hidden.size > 0 ? hidden : undefined);
+            const vertexData = createVertexDataFromModel(modelName, hidden.size > 0 ? hidden : undefined);
+            if (!vertexData) return null;
+            const mesh = new BABYLON.Mesh("block");
+            vertexData.applyToMesh(mesh);
+            mesh.material = getMinecraftMaterialFromName(normalizeName(modelName));
             mesh.position = new BABYLON.Vector3(x, y, z).add(offset);
             mesh.position.scaleInPlace(16);
             scene.removeMesh(mesh);
-            if (mesh.name === "emptyModel") return null;
             return mesh;
         }).filter((m) => !!m)
     );
 
     const merged = BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, true)!;
     scene.removeMesh(merged);
+    await merged.optimizeIndicesAsync();
     asyncMaterials.add({ model: "block/air", mesh: merged, position: offset });
 }
 

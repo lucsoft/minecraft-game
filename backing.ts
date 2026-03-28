@@ -1,5 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
 import { assert, assertArrayIncludes } from "@std/assert";
+import { memoize } from "@std/cache";
 import { AtlasMetaData, FaceName, getAtlasMetaData, getMinecraftMaterialFromName, getMinecraftModelInfo, MinecraftBlockstate, minecraftBlockstates, MinecraftModel, normalizeName } from "./assets.ts";
 
 
@@ -27,11 +28,15 @@ const faceBrightness: Record<string, number> = {
     west: 0.6,
 };
 
-function getFaceColors(face: string, vertexCount: number): number[] {
+// Plains biome grass tint (#79C05A)
+const grassTint = [ 0x79 / 255, 0xC0 / 255, 0x5A / 255 ] as const;
+
+function getFaceColors(face: string, vertexCount: number, tintindex?: number): number[] {
     const brightness = faceBrightness[ face ] ?? 1.0;
+    const [ tr, tg, tb ] = tintindex !== undefined ? grassTint : [ 1, 1, 1 ];
     const colors: number[] = [];
     for (let i = 0; i < vertexCount; i++)
-        colors.push(brightness, brightness, brightness, 1.0);
+        colors.push(brightness * tr, brightness * tg, brightness * tb, 1.0);
     return colors;
 }
 
@@ -145,6 +150,13 @@ export function resolveTextureVariables(texture: string, textures: Record<string
     return texture;
 }
 
+const resolveTextures = memoize((normalizedName: string) => {
+    const model = getMinecraftModelInfo(normalizedName);
+    if (!model?.textures) return {};
+    const textureList = Object.entries(model.textures).map(([ key, value ]) => [ key, resolveTextureVariables(value, model.textures!) ]);
+    return Object.fromEntries(textureList.map(([ key, value ]) => [ key, getAtlasMetaData(value) ])) as Record<string, AtlasMetaData>;
+});
+
 export function createVertexDataFromModel(externalName: string, hideFaces?: ReadonlySet<string>): BABYLON.VertexData | null {
     const realName = normalizeName(externalName);
     const model = getMinecraftModelInfo(realName);
@@ -152,8 +164,7 @@ export function createVertexDataFromModel(externalName: string, hideFaces?: Read
 
     if (!model.elements || !model.textures) return null;
 
-    const textureList = Object.entries(model.textures).map(([ key, value ]) => [ key, resolveTextureVariables(value, model.textures ?? {}) ]);
-    const resolvedTextures: Record<string, AtlasMetaData> = Object.fromEntries(textureList.map(([ key, value ]) => [ key, getAtlasMetaData(value) ]));
+    const resolvedTextures = resolveTextures(realName);
 
     const allPositions: number[] = [];
     const allIndices: number[] = [];
@@ -180,7 +191,7 @@ export function createVertexDataFromModel(externalName: string, hideFaces?: Read
 
             const faceUV = face.uv || getDefaultFaceUV(element, faceName);
             allUVs.push(...computeFaceUVAtlasMapped(faceName, faceUV, atlasUV, face.rotation));
-            allColors.push(...getFaceColors(faceName, 4));
+            allColors.push(...getFaceColors(faceName, 4, face.tintindex));
         }
     }
 
@@ -262,3 +273,6 @@ export function isEmptyModel(name: string) {
     if (model.elements.length === 0) return true;
     return false;
 }
+
+export const solidBlock = memoize((name: string) => isSolidBlock(name));
+export const emptyModel = memoize((name: string) => isEmptyModel(name));

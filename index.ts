@@ -30,14 +30,12 @@ loadAssets().then(async () => {
     //     asyncMaterials.add({ model: "block/stone", position: new BABYLON.Vector3(x + x + 1, -1, z + z - 3) });
     // });
     const seed = 5;
-    for (const element of range(0, 3)) {
+    for (const element of range(0, 5)) {
         // first generate the world always + 1 in the radius and + 1 in the skip radius
         const world = generateWorld(seed, element, element - 1);
         for (const { z, x, layers } of world) {
-            await renderChunk(layers, new BABYLON.Vector3(x * 16, -5 * 16, z * 16), scene);
-            await new Promise(resolve => setTimeout(resolve, 500));
+            renderChunk(layers, new BABYLON.Vector3(x * 16, -5 * 16, z * 16), scene);
         }
-        await new Promise(resolve => setTimeout(resolve, 5000));
     }
 });
 

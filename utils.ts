@@ -1,6 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
 import { getMinecraftMaterialFromName, normalizeName } from "./assets.ts";
-import { createVertexDataFromModel, isEmptyModel, isSolidBlock } from "./backing.ts";
+import { createVertexDataFromModel, emptyModel, solidBlock } from "./backing.ts";
 
 export function iteratorToStream<T>(iterator: AsyncIterator<T>) {
     return new ReadableStream<T>({
@@ -19,21 +19,29 @@ export function iteratorToStream<T>(iterator: AsyncIterator<T>) {
 
 export const asyncMaterials = new Set<{ model: string, position: BABYLON.Vector3, mesh?: BABYLON.Mesh; }>();
 
-export async function renderChunk(layers: string[][], offset: BABYLON.Vector3, scene: BABYLON.Scene) {
+export function renderChunk(layers: string[][], offset: BABYLON.Vector3, scene: BABYLON.Scene) {
     const layerSize = 16;
 
-    const solidLayers = layers.map(layer => layer.every(block => isSolidBlock(block)));
+    const solidLayers = layers.map(layer => layer.every(block => solidBlock(block)));
 
     const isOpaque = (x: number, y: number, z: number): boolean => {
         if (x < 0 || x >= layerSize || z < 0 || z >= layerSize) return false;
         if (y < 0 || y >= layers.length) return false;
         if (solidLayers[ y ]) return true;
-        return isSolidBlock(layers[ y ][ x + z * layerSize ]);
+        return solidBlock(layers[ y ][ x + z * layerSize ]);
     };
 
-    const meshes = layers.flatMap((layer, y) =>
-        layer.map((modelName, index) => {
-            if (isEmptyModel(modelName)) return null;
+    const allPositions: number[] = [];
+    const allIndices: number[] = [];
+    const allUVs: number[] = [];
+    const allColors: number[] = [];
+    let indexOffset = 0;
+
+    for (let y = 0; y < layers.length; y++) {
+        const layer = layers[ y ];
+        for (let index = 0; index < layer.length; index++) {
+            const modelName = layer[ index ];
+            if (emptyModel(modelName)) continue;
 
             const x = index % layerSize;
             const z = Math.floor(index / layerSize);
@@ -46,21 +54,34 @@ export async function renderChunk(layers: string[][], offset: BABYLON.Vector3, s
             if (isOpaque(x - 1, y, z)) hidden.add("west");
             if (isOpaque(x + 1, y, z)) hidden.add("east");
 
-            const vertexData = createVertexDataFromModel(modelName, hidden.size > 0 ? hidden : undefined);
-            if (!vertexData) return null;
-            const mesh = new BABYLON.Mesh("block");
-            vertexData.applyToMesh(mesh);
-            mesh.material = getMinecraftMaterialFromName(normalizeName(modelName));
-            mesh.position = new BABYLON.Vector3(x, y, z).add(offset);
-            mesh.position.scaleInPlace(16);
-            scene.removeMesh(mesh);
-            return mesh;
-        }).filter((m) => !!m)
-    );
+            const vd = createVertexDataFromModel(modelName, hidden.size > 0 ? hidden : undefined);
+            if (!vd) continue;
 
-    const merged = BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, true)!;
+            const positions = vd.positions as number[];
+            const blockOffset = new BABYLON.Vector3(x, y, z).add(offset).scale(16);
+            for (let i = 0; i < positions.length; i += 3) {
+                allPositions.push(positions[ i ] + blockOffset.x, positions[ i + 1 ] + blockOffset.y, positions[ i + 2 ] + blockOffset.z);
+            }
+
+            for (const idx of (vd.indices as number[]))
+                allIndices.push(idx + indexOffset);
+
+            allUVs.push(...(vd.uvs as number[]));
+            allColors.push(...(vd.colors as number[]));
+            indexOffset += positions.length / 3;
+        }
+    }
+
+    const vertexData = new BABYLON.VertexData();
+    vertexData.positions = allPositions;
+    vertexData.indices = allIndices;
+    vertexData.uvs = allUVs;
+    vertexData.colors = allColors;
+
+    const merged = new BABYLON.Mesh("chunk");
+    vertexData.applyToMesh(merged);
+    merged.material = getMinecraftMaterialFromName(normalizeName("block/stone"));
     scene.removeMesh(merged);
-    await merged.optimizeIndicesAsync();
     asyncMaterials.add({ model: "block/air", mesh: merged, position: offset });
 }
 

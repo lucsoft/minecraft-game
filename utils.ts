@@ -1,6 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
-import { getMinecraftMaterialFromName, normalizeName } from "./assets.ts";
 import { createVertexDataFromModel, emptyModel, solidBlock } from "./backing.ts";
+import { Chunk } from "./world.ts";
 
 export function iteratorToStream<T>(iterator: AsyncIterator<T>) {
     return new ReadableStream<T>({
@@ -17,18 +17,20 @@ export function iteratorToStream<T>(iterator: AsyncIterator<T>) {
     });
 }
 
-export const asyncMaterials = new Set<{ model: string, position: BABYLON.Vector3, mesh?: BABYLON.Mesh; }>();
+export const rawChunks = new Set<{ index: number, x: number, z: number, chunk: Chunk; }>();
+export const computedChunks = new Set<{ index: number, x: number, z: number, chunkData: BABYLON.VertexData; }>();
 
-export function renderChunk(layers: string[][], offset: BABYLON.Vector3, scene: BABYLON.Scene) {
+export function renderChunk(chunk: Chunk, offset: BABYLON.Vector3) {
     const layerSize = 16;
+    const layers = chunk.layers;
 
-    const solidLayers = layers.map(layer => layer.every(block => solidBlock(block)));
+    const solidLayers = layers.map(layer => layer.every(block => solidBlock(chunk.blockPalette[ block ])));
 
     const isOpaque = (x: number, y: number, z: number): boolean => {
         if (x < 0 || x >= layerSize || z < 0 || z >= layerSize) return false;
         if (y < 0 || y >= layers.length) return false;
         if (solidLayers[ y ]) return true;
-        return solidBlock(layers[ y ][ x + z * layerSize ]);
+        return solidBlock(chunk.blockPalette[ layers[ y ][ x + z * layerSize ] ]);
     };
 
     const allPositions: number[] = [];
@@ -40,7 +42,7 @@ export function renderChunk(layers: string[][], offset: BABYLON.Vector3, scene: 
     for (let y = 0; y < layers.length; y++) {
         const layer = layers[ y ];
         for (let index = 0; index < layer.length; index++) {
-            const modelName = layer[ index ];
+            const modelName = chunk.blockPalette[ layer[ index ] ];
             if (emptyModel(modelName)) continue;
 
             const x = index % layerSize;
@@ -77,12 +79,7 @@ export function renderChunk(layers: string[][], offset: BABYLON.Vector3, scene: 
     vertexData.indices = allIndices;
     vertexData.uvs = allUVs;
     vertexData.colors = allColors;
-
-    const merged = new BABYLON.Mesh("chunk");
-    vertexData.applyToMesh(merged);
-    merged.material = getMinecraftMaterialFromName(normalizeName("block/stone"));
-    scene.removeMesh(merged);
-    asyncMaterials.add({ model: "block/air", mesh: merged, position: offset });
+    return vertexData;
 }
 
 export function blockBorder(index: number, radius: number, insideBlock: string, outsideBlock: string, chunkSize = 16) {

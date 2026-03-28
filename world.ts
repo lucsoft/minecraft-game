@@ -41,10 +41,23 @@ function terrainHeight(seed: number, x: number, z: number): number {
     return Math.floor(raw * 24 + (SEA_LEVEL - 4));
 }
 
-export function generateChunk(chunkX: number, chunkZ: number, seed: number): string[][] {
-    const layers: string[][] = Array.from(
+const blockIndex = {
+    "block/air": 0,
+    "block/bedrock": 1,
+    "block/stone": 2,
+    "block/dirt": 3,
+    "block/grass_block": 4,
+};
+
+export interface Chunk {
+    blockPalette: string[];
+    layers: number[][];
+}
+
+export function generateChunk(chunkX: number, chunkZ: number, seed: number): Chunk {
+    const layers: number[][] = Array.from(
         { length: WORLD_HEIGHT },
-        () => Array(CHUNK_SIZE * CHUNK_SIZE).fill("block/air")
+        () => Array(CHUNK_SIZE * CHUNK_SIZE).fill(blockIndex[ "block/air" ])
     );
 
     for (let z = 0; z < CHUNK_SIZE; z++) {
@@ -54,29 +67,32 @@ export function generateChunk(chunkX: number, chunkZ: number, seed: number): str
             const height = terrainHeight(seed, worldX, worldZ);
             const index = x + z * CHUNK_SIZE;
 
-            layers[ 0 ][ index ] = "block/bedrock";
+            layers[ 0 ][ index ] = blockIndex[ "block/bedrock" ];
 
             for (let y = 1; y < height - 3; y++)
-                layers[ y ][ index ] = "block/stone";
+                layers[ y ][ index ] = blockIndex[ "block/stone" ];
 
             for (let y = Math.max(1, height - 3); y < height; y++)
-                layers[ y ][ index ] = "block/dirt";
+                layers[ y ][ index ] = blockIndex[ "block/dirt" ];
 
             if (height < WORLD_HEIGHT)
-                layers[ height ][ index ] = "block/grass_block";
+                layers[ height ][ index ] = blockIndex[ "block/grass_block" ];
         }
     }
 
-    return layers;
+    return {
+        blockPalette: Object.keys(blockIndex),
+        layers
+    };
 }
 
 export function generateWorld(seed: number, radius: number, skipRadius: number) {
-    const chunks: { x: number, z: number, layers: string[][]; }[] = [];
+    const chunks: { x: number, z: number, chunk: Chunk; }[] = [];
     for (let z = -radius; z <= radius; z++) {
         for (let x = -radius; x <= radius; x++) {
             // continue if within skip radius
             if (Math.abs(x) <= skipRadius && Math.abs(z) <= skipRadius) continue;
-            chunks.push({ x, z, layers: generateChunk(x, z, seed) });
+            chunks.push({ x, z, chunk: generateChunk(x, z, seed) });
         }
     }
     return chunks;

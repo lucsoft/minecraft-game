@@ -1,10 +1,8 @@
 import * as BABYLON from "@babylonjs/core";
-import { memoize } from "@std/cache";
 import './assets.ts';
-import { assetState, loadAssets } from "./assets.ts";
-import { bakeModel } from "./backing.ts";
+import { assetState, getMinecraftMaterialFromName, loadAssets, normalizeName } from "./assets.ts";
 import './css.ts';
-import { asyncMaterials, range, renderChunk } from "./utils.ts";
+import { computedChunks, range, rawChunks, renderChunk } from "./utils.ts";
 import { generateWorld } from "./world.ts";
 
 document.head.innerHTML += `<meta name="color-scheme" content="light dark">`;
@@ -13,33 +11,15 @@ document.body.append(canvas);
 const engine = new BABYLON.WebGPUEngine(canvas, { antialias: true, adaptToDeviceRatio: true });
 await engine.initAsync();
 const scene = new BABYLON.Scene(engine);
-loadAssets().then(async () => {
-    // const blockStates = minecraftBlockstates.entries()
-    //     .filter(([ _, value ]) => value.variants !== undefined)
-    //     .map(([ _, value ]) => {
-    //         const lookupKey = (key: string) => Array.isArray(value.variants![ key ]) ? value.variants![ key ][ 0 ].model : value.variants![ key ].model;
-    //         return Object.keys(value.variants!).map(k => lookupKey(k))[ 0 ];
-    //     })
-    //     .filter((modelName) => !isEmptyModel(modelName));
-
-    // const rowLimit = 25;
-    // blockStates.toArray().toSorted().entries().forEach(([ index, modelName ]) => {
-    //     const x = index % rowLimit;
-    //     const z = Math.floor(index / rowLimit);
-    //     asyncMaterials.add({ model: modelName, position: new BABYLON.Vector3(x + x + 1, 0, z + z - 3) });
-    //     asyncMaterials.add({ model: "block/stone", position: new BABYLON.Vector3(x + x + 1, -1, z + z - 3) });
-    // });
+loadAssets().then(() => {
     const seed = 5;
-    for (const element of range(0, 5)) {
-        // first generate the world always + 1 in the radius and + 1 in the skip radius
+    for (const element of range(0, 20)) {
         const world = generateWorld(seed, element, element - 1);
-        for (const { z, x, layers } of world) {
-            renderChunk(layers, new BABYLON.Vector3(x * 16, -5 * 16, z * 16), scene);
+        for (const { z, x, chunk } of world) {
+            rawChunks.add({ index: rawChunks.size, x, z, chunk });
         }
     }
 });
-
-
 
 const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(20, 20, -20), scene);
 camera.attachControl();
@@ -52,27 +32,39 @@ camera.keysDownward = [ 16 ];
 camera.speed = 5;
 camera.mode = BABYLON.Camera.PERSPECTIVE_CAMERA;
 new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, -1), scene);
+const activeChunks: number[] = [];
+const activeRawChunks: number[] = [];
 
-const modelBoxes = memoize((model: string) => {
-    const box = bakeModel(model);
-    scene.removeMesh(box);
-    return box;
-});
+function updateChunkVertexData() {
+    const start = performance.now();
+    for (const element of rawChunks) {
+        if (activeRawChunks.includes(element.index)) continue;
+        if (performance.now() - start > 5) break;
+        computedChunks.add({
+            index: element.index, x: element.x, z: element.z,
+            chunkData: renderChunk(element.chunk, new BABYLON.Vector3(element.x * 16, -5 * 16, element.z * 16))
+        });
+        activeRawChunks.push(element.index);
+    }
+}
+
+function updateChunkMeshPipeline() {
+    const start = performance.now();
+    for (const element of computedChunks) {
+        if (activeChunks.includes(element.index)) continue;
+        if (performance.now() - start > 5) break;
+        const mesh = new BABYLON.Mesh("chunk", null);
+        element.chunkData.applyToMesh(mesh);
+        mesh.material = getMinecraftMaterialFromName(normalizeName("block/stone"));
+        activeChunks.push(element.index);
+    }
+}
 
 engine.runRenderLoop(() => {
     scene.render();
-    if (assetState.loaded) {
-        while (asyncMaterials.size > 0) {
-            const asyncMaterial = asyncMaterials.values().next().value!;
-            asyncMaterials.delete(asyncMaterial);
-            if (asyncMaterial.mesh) {
-                scene.addMesh(asyncMaterial.mesh);
-            } else {
-                const box = modelBoxes(asyncMaterial.model).clone();
-                box.position = asyncMaterial.position.scale(16);
-            }
-        }
-    }
+    if (!assetState.loaded) return;
+    updateChunkVertexData();
+    updateChunkMeshPipeline();
 });
 
 addEventListener("keydown", (e) => {

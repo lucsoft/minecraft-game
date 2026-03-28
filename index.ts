@@ -38,7 +38,8 @@ const scene = new BABYLON.Scene(engine);
 
 const camera = setupCamera(scene);
 camera.position.y = 100 * 16;
-new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, -1), scene);
+const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, -1), scene);
+light.groundColor = new BABYLON.Color3(0.3, 0.3, 0.3);
 
 const player = createEntity(camera.position);
 setControlledEntity(player.id);
@@ -51,7 +52,7 @@ async function startGame() {
     await loadAssets();
     // load test world
     const seed = 5;
-    for (const element of range(0, 3)) {
+    for (const element of range(0, 5)) {
         const world = generateWorld(seed, element, element - 1);
         for (const { z, x, chunk } of world) {
             rawChunks.add({ x, z, chunk });
@@ -70,14 +71,14 @@ async function startGame() {
         .filter((modelName) => !isEmptyModel(modelName));
     const items = Array.from(blockStates);
     let counter = 0;
-    const name = items[ counter % items.length ];
-    debugMutateChunk(chunk!, { x: 0, y: 72, z: 0 }, name);
     setInterval(() => {
-        const name = items[ counter % items.length ];
-        debugMutateChunk(chunk!, { x: 0, y: 72, z: 0 }, name);
-        counter++;
+        debugMutateChunk(chunk!, { x: 0, y: 72, z: 0 }, items[ ++counter % items.length ]);
+        debugMutateChunk(chunk!, { x: 0, y: 72, z: 1 }, items[ (counter + 1) % items.length ]);
+        debugMutateChunk(chunk!, { x: 0, y: 72, z: 2 }, items[ (counter + 2) % items.length ]);
+        debugMutateChunk(chunk!, { x: 0, y: 72, z: 3 }, items[ (counter + 3) % items.length ]);
+        debugMutateChunk(chunk!, { x: 0, y: 72, z: 4 }, items[ (counter + 4) % items.length ]);
         staleChunks.set(`0,0`, { vertexUpdated: false });
-    }, 1000);
+    }, 200);
 }
 
 

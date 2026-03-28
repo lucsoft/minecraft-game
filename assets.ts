@@ -128,6 +128,8 @@ export const getMinecraftMaterialFromName = memoize((path: string) => {
     material.useAlphaFromDiffuseTexture = true;
     material.transparencyMode = BABYLON.Material.MATERIAL_ALPHATESTANDBLEND;
     material.forceDepthWrite = true;
+    material.specularColor = new BABYLON.Color3(0.07, 0.07, 0.07);
+    material.specularPower = 8;
     return material;
 });
 

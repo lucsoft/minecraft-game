@@ -145,72 +145,62 @@ export function resolveTextureVariables(texture: string, textures: Record<string
     return texture;
 }
 
-export function bakeModel(externalName: string, hideFaces?: ReadonlySet<string>) {
+export function createVertexDataFromModel(externalName: string, hideFaces?: ReadonlySet<string>): BABYLON.VertexData | null {
     const realName = normalizeName(externalName);
     const model = getMinecraftModelInfo(realName);
     assert(model != null, `Model not found: ${realName}`);
 
-    if (!model.elements || !model.textures)
-        return new BABYLON.Mesh("emptyModel");
+    if (!model.elements || !model.textures) return null;
 
     const textureList = Object.entries(model.textures).map(([ key, value ]) => [ key, resolveTextureVariables(value, model.textures ?? {}) ]);
     const resolvedTextures: Record<string, AtlasMetaData> = Object.fromEntries(textureList.map(([ key, value ]) => [ key, getAtlasMetaData(value) ]));
 
-    const meshes: BABYLON.Mesh[] = [];
+    const allPositions: number[] = [];
+    const allIndices: number[] = [];
+    const allUVs: number[] = [];
+    const allColors: number[] = [];
+    let indexOffset = 0;
 
     for (const element of model.elements) {
-        const positions: BABYLON.FloatArray = [];
-        const indices = [];
-        const uvs = [];
-        const colors: number[] = [];
-        let indexOffset = 0;
         assertArrayIncludes(expectedFaces, Object.keys(element.faces), 'Element is missing some faces');
         for (const faceName of expectedFaces) {
             const face = element.faces[ faceName as keyof typeof element.faces ];
             if (!face || hideFaces?.has(faceName)) continue;
             const atlasUV = resolvedTextures[ face.texture.replace("#", "") ]?.atlasUV;
             assert(atlasUV != null, `Texture not found for face ${faceName} in element ${realName}`);
-            assert(face != null, `Element is missing face: ${faceName}`);
             let vertices = getFaceVertices(element, faceName);
             if (element.rotation)
                 vertices = applyRotation(vertices, element.rotation);
 
-            // Push positions
-            vertices.forEach(v => positions.push(v.x, v.y, v.z));
+            vertices.forEach(v => allPositions.push(v.x, v.y, v.z));
 
-            // Two triangles per quad
-            indices.push(indexOffset, indexOffset + 1, indexOffset + 2);
-            indices.push(indexOffset, indexOffset + 2, indexOffset + 3);
+            allIndices.push(indexOffset, indexOffset + 1, indexOffset + 2);
+            allIndices.push(indexOffset, indexOffset + 2, indexOffset + 3);
             indexOffset += 4;
 
-            const faceUV = element.faces[ faceName as keyof typeof element.faces ].uv || getDefaultFaceUV(element, faceName);
-            const faceUVs = computeFaceUVAtlasMapped(faceName, faceUV, atlasUV, face.rotation);
-
-            uvs.push(...faceUVs);
-            colors.push(...getFaceColors(faceName, 4));
+            const faceUV = face.uv || getDefaultFaceUV(element, faceName);
+            allUVs.push(...computeFaceUVAtlasMapped(faceName, faceUV, atlasUV, face.rotation));
+            allColors.push(...getFaceColors(faceName, 4));
         }
-
-
-        if (positions.length === 0) continue;
-
-        const customMesh = new BABYLON.Mesh("bakedElement");
-
-        const vertexData = new BABYLON.VertexData();
-        vertexData.positions = positions;
-        vertexData.indices = indices;
-        vertexData.uvs = uvs;
-        vertexData.colors = colors;
-
-        vertexData.applyToMesh(customMesh);
-        customMesh.material = getMinecraftMaterialFromName(realName);
-        meshes.push(customMesh);
     }
 
-    if (meshes.length === 0) return new BABYLON.Mesh("emptyModel");
+    if (allPositions.length === 0) return null;
 
-    const parentMesh = BABYLON.Mesh.MergeMeshes(meshes, undefined, true, undefined, undefined, true)!;
+    const vertexData = new BABYLON.VertexData();
+    vertexData.positions = allPositions;
+    vertexData.indices = allIndices;
+    vertexData.uvs = allUVs;
+    vertexData.colors = allColors;
+    return vertexData;
+}
 
-    return parentMesh;
+export function bakeModel(externalName: string, hideFaces?: ReadonlySet<string>): BABYLON.Mesh {
+    const vertexData = createVertexDataFromModel(externalName, hideFaces);
+    if (!vertexData) return new BABYLON.Mesh("emptyModel");
+    const mesh = new BABYLON.Mesh("bakedModel");
+    vertexData.applyToMesh(mesh);
+    mesh.material = getMinecraftMaterialFromName(normalizeName(externalName));
+    return mesh;
 }
 
 const transparentBlocks = new Set([

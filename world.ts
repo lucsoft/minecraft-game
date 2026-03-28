@@ -54,9 +54,12 @@ export interface Chunk {
     blocks: number[];
 }
 
+export function getIndexFromLocalBlock(x: number, y: number, z: number): number {
+    return x + z * CHUNK_SIZE + y * CHUNK_SIZE * CHUNK_SIZE;
+}
+
 export function generateChunk(chunkX: number, chunkZ: number, seed: number): Chunk {
     const blocks = new Array(WORLD_HEIGHT * CHUNK_SIZE * CHUNK_SIZE).fill(blockIndex[ "block/air" ]);
-    const idx = (x: number, y: number, z: number) => x + z * CHUNK_SIZE + y * CHUNK_SIZE * CHUNK_SIZE;
 
     for (let z = 0; z < CHUNK_SIZE; z++) {
         for (let x = 0; x < CHUNK_SIZE; x++) {
@@ -64,16 +67,16 @@ export function generateChunk(chunkX: number, chunkZ: number, seed: number): Chu
             const worldZ = chunkZ * CHUNK_SIZE + z;
             const height = terrainHeight(seed, worldX, worldZ);
 
-            blocks[ idx(x, 0, z) ] = blockIndex[ "block/bedrock" ];
+            blocks[ getIndexFromLocalBlock(x, 0, z) ] = blockIndex[ "block/bedrock" ];
 
             for (let y = 1; y < height - 3; y++)
-                blocks[ idx(x, y, z) ] = blockIndex[ "block/stone" ];
+                blocks[ getIndexFromLocalBlock(x, y, z) ] = blockIndex[ "block/stone" ];
 
             for (let y = Math.max(1, height - 3); y < height; y++)
-                blocks[ idx(x, y, z) ] = blockIndex[ "block/dirt" ];
+                blocks[ getIndexFromLocalBlock(x, y, z) ] = blockIndex[ "block/dirt" ];
 
             if (height < WORLD_HEIGHT)
-                blocks[ idx(x, height, z) ] = blockIndex[ "block/grass_block" ];
+                blocks[ getIndexFromLocalBlock(x, height, z) ] = blockIndex[ "block/grass_block" ];
         }
     }
 
@@ -82,6 +85,16 @@ export function generateChunk(chunkX: number, chunkZ: number, seed: number): Chu
         blocks
     };
 }
+
+export function debugMutateChunk(chunk: Chunk, position: { x: number, y: number, z: number; }, blockName: string) {
+
+    if (!chunk.blockPalette.includes(blockName)) {
+        chunk.blockPalette.push(blockName);
+    }
+    const blockId = chunk.blockPalette.indexOf(blockName);
+    chunk.blocks[ getIndexFromLocalBlock(position.x, position.y, position.z) ] = blockId;
+}
+
 
 export function generateWorld(seed: number, radius: number, skipRadius: number) {
     const chunks: { x: number, z: number, chunk: Chunk; }[] = [];

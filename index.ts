@@ -5,7 +5,7 @@ import { isSolidBlock } from "./backing.ts";
 import { setupCamera, setupCameraInput, tickCamera } from "./camera.ts";
 import { createEntity, setControlledEntity } from "./entities.ts";
 import { computedChunks, range, rawChunks, renderChunk } from "./utils.ts";
-import { Chunk, CHUNK_SIZE, generateWorld } from "./world.ts";
+import { Chunk, CHUNK_SIZE, generateWorld, getIndexFromLocalBlock } from "./world.ts";
 
 const CHUNK_Y_BLOCK_OFFSET = -5 * CHUNK_SIZE;
 const chunkMap = new Map<string, Chunk>();
@@ -20,7 +20,7 @@ function isBlockSolid(bx: number, by: number, bz: number): boolean {
     const localY = by - CHUNK_Y_BLOCK_OFFSET;
     const worldHeight = chunk.blocks.length / (CHUNK_SIZE * CHUNK_SIZE);
     if (localY < 0 || localY >= worldHeight) return false;
-    const blockId = chunk.blocks[ localX + localZ * CHUNK_SIZE + localY * CHUNK_SIZE * CHUNK_SIZE ];
+    const blockId = chunk.blocks[ getIndexFromLocalBlock(localX, localY, localZ) ];
     return isSolidBlock(chunk.blockPalette[ blockId ]);
 }
 

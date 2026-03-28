@@ -1,7 +1,7 @@
 import * as BABYLON from "@babylonjs/core";
 import { memoize } from "@std/cache/memoize";
 import { createVertexDataFromModel, emptyModel, solidBlock } from "./backing.ts";
-import { Chunk, CHUNK_SIZE } from "./world.ts";
+import { Chunk, CHUNK_SIZE, getIndexFromLocalBlock } from "./world.ts";
 
 export function iteratorToStream<T>(iterator: AsyncIterator<T>) {
     return new ReadableStream<T>({
@@ -31,12 +31,11 @@ const vertexDataFromModel = memoize((modelName: string, mask: number) => {
 
 export function renderChunk(chunk: Chunk, offset: BABYLON.Vector3) {
     const worldHeight = chunk.blocks.length / (CHUNK_SIZE * CHUNK_SIZE);
-    const idx = (x: number, y: number, z: number) => x + z * CHUNK_SIZE + y * CHUNK_SIZE * CHUNK_SIZE;
 
     const solidLayers = Array.from({ length: worldHeight }, (_, y) => {
         for (let z = 0; z < CHUNK_SIZE; z++)
             for (let x = 0; x < CHUNK_SIZE; x++)
-                if (!solidBlock(chunk.blockPalette[ chunk.blocks[ idx(x, y, z) ] ])) return false;
+                if (!solidBlock(chunk.blockPalette[ chunk.blocks[ getIndexFromLocalBlock(x, y, z) ] ])) return false;
         return true;
     });
 
@@ -44,7 +43,7 @@ export function renderChunk(chunk: Chunk, offset: BABYLON.Vector3) {
         if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE) return false;
         if (y < 0 || y >= worldHeight) return false;
         if (solidLayers[ y ]) return true;
-        return solidBlock(chunk.blockPalette[ chunk.blocks[ idx(x, y, z) ] ]);
+        return solidBlock(chunk.blockPalette[ chunk.blocks[ getIndexFromLocalBlock(x, y, z) ] ]);
     };
 
     const allPositions: number[] = [];
@@ -55,7 +54,7 @@ export function renderChunk(chunk: Chunk, offset: BABYLON.Vector3) {
     for (let y = 0; y < worldHeight; y++) {
         for (let z = 0; z < CHUNK_SIZE; z++) {
             for (let x = 0; x < CHUNK_SIZE; x++) {
-                const modelName = chunk.blockPalette[ chunk.blocks[ idx(x, y, z) ] ];
+                const modelName = chunk.blockPalette[ chunk.blocks[ getIndexFromLocalBlock(x, y, z) ] ];
                 if (emptyModel(modelName)) continue;
 
                 let mask = 0;

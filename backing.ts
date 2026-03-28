@@ -1,6 +1,6 @@
+import * as BABYLON from "@babylonjs/core";
 import { assert, assertArrayIncludes } from "@std/assert";
 import { AtlasMetaData, FaceName, getAtlasMetaData, getMinecraftMaterialFromName, getMinecraftModelInfo, MinecraftBlockstate, minecraftBlockstates, MinecraftModel, normalizeName } from "./assets.ts";
-import * as BABYLON from "@babylonjs/core";
 
 
 export function getBlock(externalName: string) {
@@ -16,20 +16,20 @@ export function getMinecraftModel(blockstate: MinecraftBlockstate) {
     return modelName;
 }
 
-const expectedFaces = ['north', 'south', 'west',  'east', 'up', 'down'];
+const expectedFaces = [ 'north', 'south', 'west', 'east', 'up', 'down' ];
 
 function getFaceVertices(element: Required<MinecraftModel>[ "elements" ][ number ], face: string) {
-    const [x1,y1,z1] = element.from;
-    const [x2,y2,z2] = element.to;
+    const [ x1, y1, z1 ] = element.from;
+    const [ x2, y2, z2 ] = element.to;
 
-    switch(face) {
-        case "up":    return [new BABYLON.Vector3(x1,y2,z1), new BABYLON.Vector3(x2,y2,z1), new BABYLON.Vector3(x2,y2,z2), new BABYLON.Vector3(x1,y2,z2)];
-        case "down":  return [new BABYLON.Vector3(x1,y1,z1), new BABYLON.Vector3(x1,y1,z2), new BABYLON.Vector3(x2,y1,z2), new BABYLON.Vector3(x2,y1,z1)];
-        case "north": return [new BABYLON.Vector3(x1,y1,z1), new BABYLON.Vector3(x2,y1,z1), new BABYLON.Vector3(x2,y2,z1), new BABYLON.Vector3(x1,y2,z1)]; // flipped
-        case "south": return [new BABYLON.Vector3(x2,y1,z2), new BABYLON.Vector3(x1,y1,z2), new BABYLON.Vector3(x1,y2,z2), new BABYLON.Vector3(x2,y2,z2)]; // flipped
-        case "west":  return [new BABYLON.Vector3(x1,y1,z2), new BABYLON.Vector3(x1,y1,z1), new BABYLON.Vector3(x1,y2,z1), new BABYLON.Vector3(x1,y2,z2)]; // flipped
-        case "east":  return [new BABYLON.Vector3(x2,y1,z1), new BABYLON.Vector3(x2,y1,z2), new BABYLON.Vector3(x2,y2,z2), new BABYLON.Vector3(x2,y2,z1)]; // flipped
-        default: throw new Error("Unknown face: "+face);
+    switch (face) {
+        case "up": return [ new BABYLON.Vector3(x1, y2, z1), new BABYLON.Vector3(x2, y2, z1), new BABYLON.Vector3(x2, y2, z2), new BABYLON.Vector3(x1, y2, z2) ];
+        case "down": return [ new BABYLON.Vector3(x1, y1, z1), new BABYLON.Vector3(x1, y1, z2), new BABYLON.Vector3(x2, y1, z2), new BABYLON.Vector3(x2, y1, z1) ];
+        case "north": return [ new BABYLON.Vector3(x1, y1, z1), new BABYLON.Vector3(x2, y1, z1), new BABYLON.Vector3(x2, y2, z1), new BABYLON.Vector3(x1, y2, z1) ]; // flipped
+        case "south": return [ new BABYLON.Vector3(x2, y1, z2), new BABYLON.Vector3(x1, y1, z2), new BABYLON.Vector3(x1, y2, z2), new BABYLON.Vector3(x2, y2, z2) ]; // flipped
+        case "west": return [ new BABYLON.Vector3(x1, y1, z2), new BABYLON.Vector3(x1, y1, z1), new BABYLON.Vector3(x1, y2, z1), new BABYLON.Vector3(x1, y2, z2) ]; // flipped
+        case "east": return [ new BABYLON.Vector3(x2, y1, z1), new BABYLON.Vector3(x2, y1, z2), new BABYLON.Vector3(x2, y2, z2), new BABYLON.Vector3(x2, y2, z1) ]; // flipped
+        default: throw new Error("Unknown face: " + face);
     }
 }
 
@@ -59,12 +59,26 @@ function applyRotation(vertices: BABYLON.Vector3[], rotation: Required<Required<
     });
 }
 
-const bottomLeftToTopLeft = (faceUV: number[]): number[] => {
-    return [16 - faceUV[0], faceUV[3], 16 - faceUV[2], faceUV[1]];
+function getDefaultFaceUV(element: Required<MinecraftModel>[ "elements" ][ number ], face: string): number[] {
+    const [ x1, y1, z1 ] = element.from;
+    const [ x2, y2, z2 ] = element.to;
+    switch (face) {
+        case "north": return [ x1, 16 - y2, x2, 16 - y1 ];
+        case "south": return [ 16 - x2, 16 - y2, 16 - x1, 16 - y1 ];
+        case "west": return [ z1, 16 - y2, z2, 16 - y1 ];
+        case "east": return [ 16 - z2, 16 - y2, 16 - z1, 16 - y1 ];
+        case "up": return [ x1, z1, x2, z2 ];
+        case "down": return [ x1, 16 - z2, x2, 16 - z1 ];
+        default: throw new Error("Unknown face: " + face);
+    }
 }
 
+const bottomLeftToTopLeft = (faceUV: number[]): number[] => {
+    return [ 16 - faceUV[ 0 ], faceUV[ 3 ], 16 - faceUV[ 2 ], faceUV[ 1 ] ];
+};
+
 function computeFaceUVAtlasMapped(face: string, faceUV: number[], atlasUV: BABYLON.Vector4, rotation = 0): number[] {
-    const faceUVVec = new BABYLON.Vector4(...bottomLeftToTopLeft(faceUV)).scale(0.0625)
+    const faceUVVec = new BABYLON.Vector4(...bottomLeftToTopLeft(faceUV)).scale(0.0625);
 
     // Map into atlas
     const au0 = BABYLON.Scalar.Lerp(atlasUV.x, atlasUV.z, faceUVVec.x);
@@ -73,17 +87,17 @@ function computeFaceUVAtlasMapped(face: string, faceUV: number[], atlasUV: BABYL
     const av1 = BABYLON.Scalar.Lerp(atlasUV.y, atlasUV.w, faceUVVec.w);
 
     let uvs: number[];
-    switch(face) {
-        case "up":    uvs = [au0,av0, au1,av0, au1,av1, au0,av1]; break;
-        case "down":  uvs = [au0,av0, au0,av1, au1,av1, au1,av0]; break;
-        case "north": uvs = [au1,av0, au0,av0, au0,av1, au1,av1]; break;
-        case "south": uvs = [au0,av0, au1,av0, au1,av1, au0,av1]; break;
-        case "west":  uvs = [au1,av0, au0,av0, au0,av1, au1,av1]; break;
-        case "east":  uvs = [au0,av0, au1,av0, au1,av1, au0,av1]; break;
-        default: throw new Error("Unknown face: "+face);
+    switch (face) {
+        case "up": uvs = [ au0, av0, au1, av0, au1, av1, au0, av1 ]; break;
+        case "down": uvs = [ au0, av0, au0, av1, au1, av1, au1, av0 ]; break;
+        case "north": uvs = [ au1, av0, au0, av0, au0, av1, au1, av1 ]; break;
+        case "south": uvs = [ au0, av0, au1, av0, au1, av1, au0, av1 ]; break;
+        case "west": uvs = [ au1, av0, au0, av0, au0, av1, au1, av1 ]; break;
+        case "east": uvs = [ au0, av0, au1, av0, au1, av1, au0, av1 ]; break;
+        default: throw new Error("Unknown face: " + face);
     }
 
-    const rotationSteps = (((["up"] as FaceName[]).includes(face) ? rotation + 180 : rotation) / 90) % 4;
+    const rotationSteps = ((([ "up" ] as FaceName[]).includes(face) ? rotation + 180 : rotation) / 90) % 4;
     return rotateFaceUVs(uvs, rotationSteps * 90);
 }
 
@@ -94,20 +108,20 @@ function rotateFaceUVs(uvs: number[], rotation: number): number[] {
     if (steps === 0) return uvs;
 
     const quad = [
-        [uvs[0], uvs[1]], // v0
-        [uvs[2], uvs[3]], // v1
-        [uvs[4], uvs[5]], // v2
-        [uvs[6], uvs[7]]  // v3
+        [ uvs[ 0 ], uvs[ 1 ] ], // v0
+        [ uvs[ 2 ], uvs[ 3 ] ], // v1
+        [ uvs[ 4 ], uvs[ 5 ] ], // v2
+        [ uvs[ 6 ], uvs[ 7 ] ]  // v3
     ];
 
-    const rotatedQuad = quad.map((_, i) => quad[(i - steps + 4) % 4]);
+    const rotatedQuad = quad.map((_, i) => quad[ (i - steps + 4) % 4 ]);
     return rotatedQuad.flat();
 }
 
 export function resolveTextureVariables(texture: string, textures: Record<string, string>) {
     if (texture.startsWith("#")) {
         const key = texture.slice(1);
-        const resolved = textures[key];
+        const resolved = textures[ key ];
         assert(resolved != null, `Texture variable not found: ${key}`);
         return resolveTextureVariables(resolved, textures);
     }
@@ -122,7 +136,7 @@ export function bakeModel(externalName: string) {
     if (!model.elements || !model.textures)
         return new BABYLON.Mesh("emptyModel");
 
-    const textureList = Object.entries(model.textures).map(([ key, value ]) => [key, resolveTextureVariables(value, model.textures ?? {})]);
+    const textureList = Object.entries(model.textures).map(([ key, value ]) => [ key, resolveTextureVariables(value, model.textures ?? {}) ]);
     const resolvedTextures: Record<string, AtlasMetaData> = Object.fromEntries(textureList.map(([ key, value ]) => [ key, getAtlasMetaData(value) ]));
 
     const meshes: BABYLON.Mesh[] = [];
@@ -147,11 +161,11 @@ export function bakeModel(externalName: string) {
             vertices.forEach(v => positions.push(v.x, v.y, v.z));
 
             // Two triangles per quad
-            indices.push(indexOffset,indexOffset+1,indexOffset+2);
-            indices.push(indexOffset,indexOffset+2,indexOffset+3);
+            indices.push(indexOffset, indexOffset + 1, indexOffset + 2);
+            indices.push(indexOffset, indexOffset + 2, indexOffset + 3);
             indexOffset += 4;
 
-            const faceUV = element.faces[ faceName as keyof typeof element.faces ].uv || [ 0, 0, 16, 16 ];
+            const faceUV = element.faces[ faceName as keyof typeof element.faces ].uv || getDefaultFaceUV(element, faceName);
             const faceUVs = computeFaceUVAtlasMapped(faceName, faceUV, atlasUV, face.rotation);
 
             uvs.push(...faceUVs);

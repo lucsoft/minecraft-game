@@ -1,8 +1,8 @@
 import * as BABYLON from "@babylonjs/core";
-import { deepMerge } from "@std/collections";
+import { assert } from "@std/assert";
 import { memoize } from "@std/cache";
 import { decodeCbor } from "@std/cbor";
-import { assert } from "@std/assert";
+import { deepMerge } from "@std/collections";
 
 interface MinecraftTexture {
     texture: BABYLON.Texture;
@@ -11,7 +11,7 @@ interface MinecraftTexture {
         width?: number;
         height?: number;
         frametime: number;
-        frames: Array<number | { index: number; time: number }>;
+        frames: Array<number | { index: number; time: number; }>;
     };
 }
 
@@ -43,8 +43,8 @@ export interface MinecraftModel {
             // texture rotation in degrees
             rotation?: 0 | 90 | 180 | 270;
             tintindex?: number;
-        }>
-    }[]
+        }>;
+    }[];
 }
 interface MinecraftModelVariantModel {
     model: string;
@@ -68,7 +68,7 @@ export const assetState = {
         data: {
             name: string,
             animation: MinecraftTexture[ "animation" ];
-        }
+        };
     }[] | null,
     blockItemsAtlas: null as BABYLON.Texture | null,
 };
@@ -130,12 +130,11 @@ export const getMinecraftMaterialFromName = memoize((path: string) => {
     return material;
 });
 
-export interface AtlasMetaData
-{
+export interface AtlasMetaData {
     name: string;
     atlasUV: BABYLON.Vector4;
     animationKeys?: number;
-    animation?: MinecraftTexture["animation"];
+    animation?: MinecraftTexture[ "animation" ];
 }
 
 export const getAtlasMetaData = memoize((name: string) => {

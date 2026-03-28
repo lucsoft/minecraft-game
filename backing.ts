@@ -18,6 +18,23 @@ export function getMinecraftModel(blockstate: MinecraftBlockstate) {
 
 const expectedFaces = [ 'north', 'south', 'west', 'east', 'up', 'down' ];
 
+const faceBrightness: Record<string, number> = {
+    up: 1.0,
+    down: 0.5,
+    north: 0.8,
+    south: 0.8,
+    east: 0.6,
+    west: 0.6,
+};
+
+function getFaceColors(face: string, vertexCount: number): number[] {
+    const brightness = faceBrightness[ face ] ?? 1.0;
+    const colors: number[] = [];
+    for (let i = 0; i < vertexCount; i++)
+        colors.push(brightness, brightness, brightness, 1.0);
+    return colors;
+}
+
 function getFaceVertices(element: Required<MinecraftModel>[ "elements" ][ number ], face: string) {
     const [ x1, y1, z1 ] = element.from;
     const [ x2, y2, z2 ] = element.to;
@@ -145,6 +162,7 @@ export function bakeModel(externalName: string) {
         const positions: BABYLON.FloatArray = [];
         const indices = [];
         const uvs = [];
+        const colors: number[] = [];
         let indexOffset = 0;
         assertArrayIncludes(expectedFaces, Object.keys(element.faces), 'Element is missing some faces');
         for (const faceName of expectedFaces) {
@@ -169,6 +187,7 @@ export function bakeModel(externalName: string) {
             const faceUVs = computeFaceUVAtlasMapped(faceName, faceUV, atlasUV, face.rotation);
 
             uvs.push(...faceUVs);
+            colors.push(...getFaceColors(faceName, 4));
         }
 
 
@@ -179,6 +198,7 @@ export function bakeModel(externalName: string) {
         vertexData.positions = positions;
         vertexData.indices = indices;
         vertexData.uvs = uvs;
+        vertexData.colors = colors;
 
         vertexData.applyToMesh(customMesh);
         customMesh.material = getMinecraftMaterialFromName(realName);

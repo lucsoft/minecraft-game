@@ -145,7 +145,7 @@ export function resolveTextureVariables(texture: string, textures: Record<string
     return texture;
 }
 
-export function bakeModel(externalName: string) {
+export function bakeModel(externalName: string, hideFaces?: ReadonlySet<string>) {
     const realName = normalizeName(externalName);
     const model = getMinecraftModelInfo(realName);
     assert(model != null, `Model not found: ${realName}`);
@@ -167,7 +167,7 @@ export function bakeModel(externalName: string) {
         assertArrayIncludes(expectedFaces, Object.keys(element.faces), 'Element is missing some faces');
         for (const faceName of expectedFaces) {
             const face = element.faces[ faceName as keyof typeof element.faces ];
-            if (!face) continue;
+            if (!face || hideFaces?.has(faceName)) continue;
             const atlasUV = resolvedTextures[ face.texture.replace("#", "") ]?.atlasUV;
             assert(atlasUV != null, `Texture not found for face ${faceName} in element ${realName}`);
             assert(face != null, `Element is missing face: ${faceName}`);
@@ -191,8 +191,9 @@ export function bakeModel(externalName: string) {
         }
 
 
-        const customMesh = new BABYLON.Mesh("bakedElement");
+        if (positions.length === 0) continue;
 
+        const customMesh = new BABYLON.Mesh("bakedElement");
 
         const vertexData = new BABYLON.VertexData();
         vertexData.positions = positions;
@@ -205,9 +206,64 @@ export function bakeModel(externalName: string) {
         meshes.push(customMesh);
     }
 
+    if (meshes.length === 0) return new BABYLON.Mesh("emptyModel");
+
     const parentMesh = BABYLON.Mesh.MergeMeshes(meshes, undefined, true, undefined, undefined, true)!;
 
     return parentMesh;
+}
+
+const transparentBlocks = new Set([
+    "glass",
+    "glass_pane",
+    "tinted_glass",
+    "ice",
+    "frosted_ice",
+    "barrier",
+    "structure_void",
+    "white_stained_glass",
+    "orange_stained_glass",
+    "magenta_stained_glass",
+    "light_blue_stained_glass",
+    "yellow_stained_glass",
+    "lime_stained_glass",
+    "pink_stained_glass",
+    "gray_stained_glass",
+    "light_gray_stained_glass",
+    "cyan_stained_glass",
+    "purple_stained_glass",
+    "blue_stained_glass",
+    "brown_stained_glass",
+    "green_stained_glass",
+    "red_stained_glass",
+    "black_stained_glass",
+    "white_stained_glass_pane",
+    "orange_stained_glass_pane",
+    "magenta_stained_glass_pane",
+    "light_blue_stained_glass_pane",
+    "yellow_stained_glass_pane",
+    "lime_stained_glass_pane",
+    "pink_stained_glass_pane",
+    "gray_stained_glass_pane",
+    "light_gray_stained_glass_pane",
+    "cyan_stained_glass_pane",
+    "purple_stained_glass_pane",
+    "blue_stained_glass_pane",
+    "brown_stained_glass_pane",
+    "green_stained_glass_pane",
+    "red_stained_glass_pane",
+    "black_stained_glass_pane",
+]);
+
+export function isSolidBlock(name: string): boolean {
+    const normalized = normalizeName(name);
+    if (transparentBlocks.has(normalized.replace("minecraft:", ""))) return false;
+    const model = getMinecraftModelInfo(normalized);
+    if (!model?.elements || model.elements.length === 0) return false;
+    return model.elements.every(el =>
+        el.from[ 0 ] === 0 && el.from[ 1 ] === 0 && el.from[ 2 ] === 0 &&
+        el.to[ 0 ] === 16 && el.to[ 1 ] === 16 && el.to[ 2 ] === 16
+    );
 }
 
 export function isEmptyModel(name: string) {

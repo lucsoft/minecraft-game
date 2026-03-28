@@ -1,19 +1,18 @@
-import { ZipReader } from "@zip-js/zip-js";
-import { ensureDir, exists } from "@std/fs";
-import { dirname } from "@std/path";
-import { encodeCbor  } from "@std/cbor";
-import { memoize, LruCache, MemoizationCacheResult } from "@std/cache";
 import { NullEngine, Scene } from "@babylonjs/core";
-import { MaxRectsPacker } from "maxrects-packer";
 import { createCanvas, Image, loadImage } from "@gfx/canvas-wasm";
+import { LruCache, MemoizationCacheResult, memoize } from "@std/cache";
+import { encodeCbor } from "@std/cbor";
+import { ensureDir, exists } from "@std/fs";
 import { serveFile } from "@std/http";
+import { dirname } from "@std/path";
+import { ZipReader } from "@zip-js/zip-js";
+import { MaxRectsPacker } from "maxrects-packer";
 const kv = await Deno.openKv("./cache/asset-cache.kv");
 const engine = new NullEngine();
 new Scene(engine);
-const validUrlPattern = /https:\/\/piston-data\.mojang\.com\/v1\/objects\/(?<objectId>.*)\/client\.jar/
+const validUrlPattern = /https:\/\/piston-data\.mojang\.com\/v1\/objects\/(?<objectId>.*)\/client\.jar/;
 
-async function makeMinecraftAssetCache(objectId: string, stream: ReadableStream<Uint8Array<ArrayBuffer>>)
-{
+async function makeMinecraftAssetCache(objectId: string, stream: ReadableStream<Uint8Array<ArrayBuffer>>) {
     const minecraftReader = new ZipReader(stream!);
 
     const files = new Set<string>();
@@ -57,7 +56,7 @@ const fileIndex = memoize(async (objectId: string) => {
 }, { cache: new LruCache<string, MemoizationCacheResult<Promise<string[]>>>(10) });
 
 const jsonCache = memoize(async (keys: string[]) => {
-    return Object.fromEntries((await Array.fromAsync(kv.list({ prefix: keys }))).map(({ key, value }) => [ key.at(-1)!, value ]))
+    return Object.fromEntries((await Array.fromAsync(kv.list({ prefix: keys }))).map(({ key, value }) => [ key.at(-1)!, value ]));
 }, { cache: new LruCache<string, MemoizationCacheResult<Promise<unknown>>>(10), getKey: (keys) => `${keys.join(":")}` });
 
 async function ensureModels(files: string[], objectId: string) {
@@ -73,8 +72,7 @@ async function ensureModels(files: string[], objectId: string) {
     await kv.set([ "models", "v0", objectId ], true);
 }
 
-async function ensureAtlas(files: string[], objectId: string)
-{
+async function ensureAtlas(files: string[], objectId: string) {
     const item = await kv.get<true>([ "atlas", "v0", objectId ]);
     if (item.value) return;
     console.log(`[INFO] Caching atlas for objectId: ${objectId}`);
@@ -85,7 +83,7 @@ async function ensureAtlas(files: string[], objectId: string)
             width?: number;
             height?: number;
             frametime: number;
-            frames: Array<number | { index: number; time: number }>;
+            frames: Array<number | { index: number; time: number; }>;
         };
     }>();
     for (const file of files) {
@@ -101,20 +99,20 @@ async function ensureAtlas(files: string[], objectId: string)
     }
     const size = 2 ** 10;
     // deno-lint-ignore no-explicit-any
-    const packer = new MaxRectsPacker<{ width: number, height: number, x: number, y: number, data: { name: string, image: Image, animation: any }; }>(size,size);
+    const packer = new MaxRectsPacker<{ width: number, height: number, x: number, y: number, data: { name: string, image: Image, animation: any; }; }>(size, size);
     const targetTextures = /^(.*:)(block|item).*$/;
     const coll = Intl.Collator("en");
-    packer.addArray((Array.from(textures.entries())).toSorted(([name],[nameB]) => coll.compare(name, nameB)).filter(([name]) => name.match(targetTextures)).map(([ name, object ]) => {
+    packer.addArray((Array.from(textures.entries())).toSorted(([ name ], [ nameB ]) => coll.compare(name, nameB)).filter(([ name ]) => name.match(targetTextures)).map(([ name, object ]) => {
         return {
             width: object.image.width(),
             height: object.image.height(),
             data: { name, ...object }
-        // deno-lint-ignore no-explicit-any
+            // deno-lint-ignore no-explicit-any
         } as any;
     }));
-     if (packer.bins.length > 1) {
+    if (packer.bins.length > 1) {
         throw new Error("Textures do not fit in a single atlas: " + packer.bins.length + " bins needed");
-     }
+    }
     const bin = packer.bins[ 0 ];
     const canvas = createCanvas(bin.width, bin.height);
 
@@ -144,7 +142,7 @@ function respond(rsp: Response) {
 
 Deno.serve(async (req) => {
     if (req.method === "OPTIONS")
-        return respond(new Response("", { status: 200}));
+        return respond(new Response("", { status: 200 }));
     console.log(`[INFO] ${req.method} - ${req.url}`);
     const url = new URL(req.url);
     if (!url.searchParams.has("url")) return respond(new Response("Missing url parameter", { status: 400 }));
@@ -161,11 +159,15 @@ Deno.serve(async (req) => {
 
     if (url.searchParams.has("atlas")) return respond(await serveFile(req, `./cache/${objectId}/atlas.cbor`));
     if (url.searchParams.has("atlaspng")) return respond(await serveFile(req, `./cache/${objectId}/atlas.png`));
-    if (url.searchParams.has("files")) return respond(Response.json(files));
+    if (url.searchParams.has("file")) {
+        const file = url.searchParams.get("file")!;
+        if (!files.includes(file)) return respond(new Response("File not found", { status: 404 }));
+        return respond(await serveFile(req, `./cache/${objectId}/${file}`));
+    }
     return respond(Response.json({
         objectId,
         files,
         blockstates: await jsonCache([ "blockstates", "v0", objectId ]),
         models: await jsonCache([ "models", "v0", objectId ]),
     }));
-})
+});

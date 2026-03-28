@@ -5,7 +5,7 @@ import "@k8s/api/networking/v1/Ingress.pkl"
 import "@Workload/Workload.pkl"
 
 local assertCdn: Workload = new {
-  name = "asset-cdn"
+  name = "asset-pipeline"
 
   spec {
     volumes {
@@ -82,7 +82,7 @@ resources {
     spec {
       rules {
         new {
-          host = "asset-cdn.lucsoft.de"
+          host = "asset-pipeline.lucsoft.de"
           http {
             paths {
               new {

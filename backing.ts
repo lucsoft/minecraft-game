@@ -1,6 +1,6 @@
-import { assert, assertArrayIncludes } from "jsr:@std/assert@1.0.6";
+import { assert, assertArrayIncludes } from "@std/assert";
 import { AtlasMetaData, FaceName, getAtlasMetaData, getMinecraftMaterialFromName, getMinecraftModelInfo, MinecraftBlockstate, minecraftBlockstates, MinecraftModel, normalizeName } from "./assets.ts";
-import * as BABYLON from "https://esm.sh/@babylonjs/core";
+import * as BABYLON from "@babylonjs/core";
 
 
 export function getBlock(externalName: string) {
@@ -59,12 +59,12 @@ function applyRotation(vertices: BABYLON.Vector3[], rotation: Required<Required<
     });
 }
 
-const topLeftToBottomLeft = (faceUV: number[]): number[] => {
-    return [faceUV[0], 16 - faceUV[3], faceUV[2], 16 - faceUV[1]];
+const bottomLeftToTopLeft = (faceUV: number[]): number[] => {
+    return [16 - faceUV[0], faceUV[3], 16 - faceUV[2], faceUV[1]];
 }
 
 function computeFaceUVAtlasMapped(face: string, faceUV: number[], atlasUV: BABYLON.Vector4, rotation = 0): number[] {
-    const faceUVVec = new BABYLON.Vector4(...topLeftToBottomLeft(faceUV)).scale(1 / 16)
+    const faceUVVec = new BABYLON.Vector4(...bottomLeftToTopLeft(faceUV)).scale(0.0625)
 
     // Map into atlas
     const au0 = BABYLON.Scalar.Lerp(atlasUV.x, atlasUV.z, faceUVVec.x);

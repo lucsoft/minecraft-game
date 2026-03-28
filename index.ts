@@ -1,10 +1,10 @@
 import './css.ts'
-import * as BABYLON from "https://esm.sh/@babylonjs/core";
+import * as BABYLON from "@babylonjs/core";
 import './assets.ts'
 import { assetState, loadAssets, minecraftBlockstates } from "./assets.ts";
 import { asyncMaterials, blockBorder, range, renderChunk } from "./utils.ts";
 import { bakeModel, isEmptyModel } from "./backing.ts";
-import { memoize } from "https://esm.sh/jsr/@std/cache";
+import { memoize } from "@std/cache";
 
 document.head.innerHTML += `<meta name="color-scheme" content="light dark">`;
 const canvas = document.createElement("canvas");

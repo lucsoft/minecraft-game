@@ -2,7 +2,7 @@
     "unstable": [
         "kv"
     ],
-    "lock": false,
+    "nodeModulesDir": "auto",
     "compilerOptions": {
         "lib": [
             "esnext",
@@ -17,7 +17,14 @@
         "cdn": "cd asset-cdn && deno run --watch -A mod.ts"
     },
     "imports": {
-        "@babylonjs/core": "https://esm.sh/@babylonjs/core",
-        "@zip-js/zip-js": "https://esm.sh/jsr/@zip-js/zip-js@^2.8.8"
+        "@babylonjs/core": "npm:@babylonjs/core@^9.0.0",
+        "@deno/vite-plugin": "npm:@deno/vite-plugin@^1.0.6",
+        "@std/assert": "jsr:@std/assert@^1.0.19",
+        "@std/cache": "jsr:@std/cache@^0.2.2",
+        "@std/cbor": "jsr:@std/cbor@^0.1.9",
+        "@std/collections": "jsr:@std/collections@^1.1.6",
+        "@zip-js/zip-js": "jsr:@zip-js/zip-js@^2.8.24",
+        "maxrects-packer": "npm:maxrects-packer@^2.7.3",
+        "vite": "npm:vite@^7.3.1"
     }
 }

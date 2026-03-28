@@ -5,3 +5,5 @@ talos
 *.otf
 *.ttf
 1.21.10
+node_modules
+.vite

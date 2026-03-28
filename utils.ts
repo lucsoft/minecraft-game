@@ -1,4 +1,4 @@
-import * as BABYLON from "https://esm.sh/@babylonjs/core";
+import * as BABYLON from "@babylonjs/core";
 import { bakeModel } from "./backing.ts";
 
 export function iteratorToStream<T>(iterator: AsyncIterator<T>) {

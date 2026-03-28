@@ -1,10 +1,20 @@
 {
+    "unstable": [
+        "kv"
+    ],
     "lock": false,
     "compilerOptions": {
         "lib": [
+            "esnext",
+            "dom.iterable",
+            "dom.asynciterable",
             "deno.window",
-            "dom"
+            "deno.unstable",
+            "dom",
         ]
+    },
+    "tasks": {
+        "cdn": "cd asset-cdn && deno run --watch -A mod.ts"
     },
     "imports": {
         "@babylonjs/core": "https://esm.sh/@babylonjs/core",

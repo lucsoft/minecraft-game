@@ -1,4 +1,5 @@
 import * as BABYLON from "@babylonjs/core";
+import { memoize } from "@std/cache/memoize";
 import { createVertexDataFromModel, emptyModel, solidBlock } from "./backing.ts";
 import { Chunk, CHUNK_SIZE } from "./world.ts";
 
@@ -19,6 +20,14 @@ export function iteratorToStream<T>(iterator: AsyncIterator<T>) {
 
 export const rawChunks = new Set<{ index: number, x: number, z: number, chunk: Chunk; }>();
 export const computedChunks = new Set<{ index: number, x: number, z: number, chunkData: BABYLON.VertexData; }>();
+
+const FACE_BITS = { up: 1, down: 2, north: 4, south: 8, west: 16, east: 32 } as const;
+const FACE_NAMES = Object.keys(FACE_BITS) as (keyof typeof FACE_BITS)[];
+
+const vertexDataFromModel = memoize((modelName: string, mask: number) => {
+    const hidden = mask === 0 ? undefined : new Set(FACE_NAMES.filter(f => mask & FACE_BITS[ f ]));
+    return createVertexDataFromModel(modelName, hidden);
+}, { getKey: (modelName, mask) => `${modelName}:${mask}` });
 
 export function renderChunk(chunk: Chunk, offset: BABYLON.Vector3) {
     const worldHeight = chunk.blocks.length / (CHUNK_SIZE * CHUNK_SIZE);
@@ -43,35 +52,36 @@ export function renderChunk(chunk: Chunk, offset: BABYLON.Vector3) {
     const allUVs: number[] = [];
     const allColors: number[] = [];
     let indexOffset = 0;
-
     for (let y = 0; y < worldHeight; y++) {
         for (let z = 0; z < CHUNK_SIZE; z++) {
             for (let x = 0; x < CHUNK_SIZE; x++) {
                 const modelName = chunk.blockPalette[ chunk.blocks[ idx(x, y, z) ] ];
                 if (emptyModel(modelName)) continue;
 
-                const hidden = new Set<string>();
-                if (isOpaque(x, y + 1, z)) hidden.add("up");
-                if (isOpaque(x, y - 1, z)) hidden.add("down");
-                if (isOpaque(x, y, z - 1)) hidden.add("north");
-                if (isOpaque(x, y, z + 1)) hidden.add("south");
-                if (isOpaque(x - 1, y, z)) hidden.add("west");
-                if (isOpaque(x + 1, y, z)) hidden.add("east");
+                let mask = 0;
+                if (isOpaque(x, y + 1, z)) mask |= FACE_BITS.up;
+                if (isOpaque(x, y - 1, z)) mask |= FACE_BITS.down;
+                if (isOpaque(x, y, z - 1)) mask |= FACE_BITS.north;
+                if (isOpaque(x, y, z + 1)) mask |= FACE_BITS.south;
+                if (isOpaque(x - 1, y, z)) mask |= FACE_BITS.west;
+                if (isOpaque(x + 1, y, z)) mask |= FACE_BITS.east;
 
-                const vd = createVertexDataFromModel(modelName, hidden.size > 0 ? hidden : undefined);
+                const vd = vertexDataFromModel(modelName, mask);
                 if (!vd) continue;
 
                 const positions = vd.positions as number[];
-                const blockOffset = new BABYLON.Vector3(x, y, z).add(offset).scale(16);
+                const bx = (x + offset.x) * 16;
+                const by = (y + offset.y) * 16;
+                const bz = (z + offset.z) * 16;
                 for (let i = 0; i < positions.length; i += 3) {
-                    allPositions.push(positions[ i ] + blockOffset.x, positions[ i + 1 ] + blockOffset.y, positions[ i + 2 ] + blockOffset.z);
+                    allPositions.push(positions[ i ] + bx, positions[ i + 1 ] + by, positions[ i + 2 ] + bz);
                 }
 
                 for (const i of (vd.indices as number[]))
                     allIndices.push(i + indexOffset);
 
-                allUVs.push(...(vd.uvs as number[]));
-                allColors.push(...(vd.colors as number[]));
+                (vd.uvs as number[]).forEach(uv => allUVs.push(uv));
+                (vd.colors as number[]).forEach(color => allColors.push(color));
                 indexOffset += positions.length / 3;
             }
         }

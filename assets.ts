@@ -75,10 +75,11 @@ export const assetState = {
 type AtlasCacheData = { rects: typeof assetState[ "blockItmesAtlasMeta" ], data: Uint8Array; width: number, height: number; };
 
 const minecraftTargetJar = "https://piston-data.mojang.com/v1/objects/d3bdf582a7fa723ce199f3665588dcfe6bf9aca8/client.jar";
-const assertCdn = new URL(`http://localhost:8000?${new URLSearchParams({ url: minecraftTargetJar })}`);
+
+const assetPipeline = new URL(`${location.hostname === "localhost" ? "http://localhost:8000" : "https://asset-pipeline.lucsoft.de/"}?${new URLSearchParams({ url: minecraftTargetJar })}`);
 
 export async function loadAssets() {
-    const requestMetadata = await fetch(assertCdn);
+    const requestMetadata = await fetch(assetPipeline);
     assert(requestMetadata.ok, "Failed to load assets: " + requestMetadata.statusText);
     const metadata = await requestMetadata.json() as {
         objectId: string;
@@ -90,7 +91,7 @@ export async function loadAssets() {
     Object.keys(metadata.blockstates).forEach(key => minecraftBlockstates.set(key, metadata.blockstates[ key ]));
     Object.keys(metadata.models).forEach(key => minecraftModels.set(key, metadata.models[ key ]));
 
-    const atlasUrl = new URL(assertCdn);
+    const atlasUrl = new URL(assetPipeline);
     atlasUrl.searchParams.set("atlas", "true");
     const atlasResponse = await fetch(atlasUrl);
     assert(atlasResponse.ok, "Failed to load atlas: " + atlasResponse.statusText);

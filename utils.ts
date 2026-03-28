@@ -18,8 +18,8 @@ export function iteratorToStream<T>(iterator: AsyncIterator<T>) {
     });
 }
 
-export const rawChunks = new Set<{ index: number, x: number, z: number, chunk: Chunk; }>();
-export const computedChunks = new Set<{ index: number, x: number, z: number, chunkData: BABYLON.VertexData; }>();
+export const rawChunks = new Set<{ x: number, z: number, chunk: Chunk; }>();
+export const computedChunks = new Set<{ x: number, z: number, chunkData: BABYLON.VertexData; }>();
 
 const FACE_BITS = { up: 1, down: 2, north: 4, south: 8, west: 16, east: 32 } as const;
 const FACE_NAMES = Object.keys(FACE_BITS) as (keyof typeof FACE_BITS)[];

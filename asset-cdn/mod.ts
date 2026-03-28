@@ -1,14 +1,13 @@
-// deno-lint-ignore-file no-import-prefix no-unversioned-import
 import { ZipReader } from "@zip-js/zip-js";
-import { ensureDir, exists } from "jsr:@std/fs";
-import { dirname } from "jsr:@std/path";
+import { ensureDir, exists } from "@std/fs";
+import { dirname } from "@std/path";
 import { encodeCbor  } from "@std/cbor";
 import { memoize, LruCache, MemoizationCacheResult } from "@std/cache";
 import { NullEngine, Scene } from "@babylonjs/core";
-import { MaxRectsPacker } from "https://esm.sh/maxrects-packer";
-import { createCanvas, Image, loadImage } from "jsr:@gfx/canvas-wasm";
-import { serveFile } from "jsr:@std/http";
-const kv = await Deno.openKv();
+import { MaxRectsPacker } from "maxrects-packer";
+import { createCanvas, Image, loadImage } from "@gfx/canvas-wasm";
+import { serveFile } from "@std/http";
+const kv = await Deno.openKv("./cache/asset-cache.kv");
 const engine = new NullEngine();
 new Scene(engine);
 const validUrlPattern = /https:\/\/piston-data\.mojang\.com\/v1\/objects\/(?<objectId>.*)\/client\.jar/
@@ -76,7 +75,7 @@ async function ensureModels(files: string[], objectId: string) {
 
 async function ensureAtlas(files: string[], objectId: string)
 {
-    const item = await kv.get<true>([ "atlas", "v3", objectId ]);
+    const item = await kv.get<true>([ "atlas", "v0", objectId ]);
     if (item.value) return;
     console.log(`[INFO] Caching atlas for objectId: ${objectId}`);
     const textures = new Map<string, {
@@ -132,7 +131,7 @@ async function ensureAtlas(files: string[], objectId: string)
     }));
     await Deno.writeFile(`./cache/${objectId}/atlas.png`, canvas.toBuffer("image/png"));
     canvas.dispose();
-    await kv.set([ "atlas", "v3", objectId ], true);
+    await kv.set([ "atlas", "v0", objectId ], true);
 }
 
 function respond(rsp: Response) {
@@ -162,7 +161,7 @@ Deno.serve(async (req) => {
 
     if (url.searchParams.has("atlas")) return respond(await serveFile(req, `./cache/${objectId}/atlas.cbor`));
     if (url.searchParams.has("atlaspng")) return respond(await serveFile(req, `./cache/${objectId}/atlas.png`));
-
+    if (url.searchParams.has("files")) return respond(Response.json(files));
     return respond(Response.json({
         objectId,
         files,

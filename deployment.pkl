@@ -1,0 +1,106 @@
+amends "@Resource/Entrypoint.pkl"
+import "@k8s/api/core/v1/PersistentVolumeClaim.pkl"
+import "@k8s/api/core/v1/Service.pkl"
+import "@k8s/api/networking/v1/Ingress.pkl"
+import "@Workload/Workload.pkl"
+
+local assertCdn: Workload = new {
+  name = "asset-cdn"
+
+  spec {
+    volumes {
+      new {
+        name = "cache"
+        persistentVolumeClaim {
+          claimName = "asset-cdn-cache"
+        }
+      }
+    }
+    containers {
+      new {
+        name = "assert-cdn"
+        image = "ghcr.io/lucsoft/asset-cdn"
+        imagePullPolicy = "Always"
+        ports {
+          new {
+            name = "http"
+            containerPort = 8000
+          }
+        }
+        volumeMounts {
+          new {
+            name = "cache"
+            mountPath = "/app/cache"
+          }
+        }
+      }
+    }
+  }
+}
+
+resources {
+  ...assertCdn.resources
+  new PersistentVolumeClaim {
+    metadata {
+      name = "asset-cdn-cache"
+    }
+    spec {
+      accessModes {
+        "ReadWriteOnce"
+      }
+      resources {
+        requests {
+          ["storage"] = "5Gi"
+        }
+      }
+    }
+  }
+  new Service {
+    metadata {
+      name = "asset-cdn"
+    }
+    spec {
+      selector {
+        ["app.kubernetes.io/name"] = assertCdn.name
+      }
+      ports {
+        new {
+          name = "http"
+          port = 80
+          targetPort = "http"
+        }
+      }
+    }
+  }
+  new Ingress {
+    metadata {
+      name = "asset-cdn"
+      annotations {
+        ["cert-manager.io/cluster-issuer"] = "lucsoft-allinkl"
+      }
+    }
+    spec {
+      rules {
+        new {
+          host = "asset-cdn.lucsoft.de"
+          http {
+            paths {
+              new {
+                path = "/"
+                pathType = "Prefix"
+                backend {
+                  service {
+                    name = "asset-cdn"
+                    port {
+                      name = "http"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

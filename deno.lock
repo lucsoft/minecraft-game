@@ -2,6 +2,7 @@
   "version": "5",
   "specifiers": {
     "jsr:@gfx/canvas-wasm@*": "0.4.2",
+    "jsr:@gfx/canvas-wasm@~0.4.2": "0.4.2",
     "jsr:@std/assert@1.0.6": "1.0.6",
     "jsr:@std/assert@^1.0.19": "1.0.19",
     "jsr:@std/bytes@^1.0.6": "1.0.6",
@@ -18,6 +19,7 @@
     "jsr:@std/fs@^1.0.23": "1.0.23",
     "jsr:@std/html@^1.0.5": "1.0.5",
     "jsr:@std/http@*": "1.0.25",
+    "jsr:@std/http@^1.0.25": "1.0.25",
     "jsr:@std/internal@^1.0.12": "1.0.12",
     "jsr:@std/internal@^1.0.4": "1.0.12",
     "jsr:@std/media-types@^1.1.0": "1.1.0",
@@ -532,10 +534,14 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@gfx/canvas-wasm@~0.4.2",
       "jsr:@std/assert@^1.0.19",
       "jsr:@std/cache@~0.2.2",
       "jsr:@std/cbor@~0.1.9",
       "jsr:@std/collections@^1.1.6",
+      "jsr:@std/fs@^1.0.23",
+      "jsr:@std/http@^1.0.25",
+      "jsr:@std/path@^1.1.4",
       "jsr:@zip-js/zip-js@^2.8.24",
       "npm:@babylonjs/core@9",
       "npm:@deno/vite-plugin@^1.0.6",

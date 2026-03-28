@@ -1,0 +1,14 @@
+services:
+  assert-cdn:
+    build:
+      context: .
+      dockerfile: ./asset-cdn/Dockerfile
+      platforms:
+        - linux/amd64
+    image: ghcr.io/lucsoft/asset-cdn
+    volumes:
+      - cache:/app/cache
+    ports:
+      - "8000:8000"
+volumes:
+  cache:

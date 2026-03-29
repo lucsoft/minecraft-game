@@ -139,6 +139,17 @@ export const getMinecraftMaterialFromName = memoize((path: string) => {
     return material;
 });
 
+export const material = memoize((name: string) => {
+    const texture = textureUrl(name);
+    // texture.hasAlpha = true;
+
+    const mat = new BABYLON.StandardMaterial("standard");
+    mat.diffuseTexture = texture;
+    mat.specularColor = new BABYLON.Color3(0, 0, 0);
+
+    return mat;
+});
+
 export interface AtlasMetaData {
     name: string;
     atlasUV: BABYLON.Vector4;

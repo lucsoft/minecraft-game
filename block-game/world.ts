@@ -1,6 +1,6 @@
 
 export const CHUNK_SIZE = 16;
-const WORLD_HEIGHT = 80;
+const WORLD_HEIGHT = 120;
 const SEA_LEVEL = 60;
 
 function hash(seed: number, x: number, z: number): number {

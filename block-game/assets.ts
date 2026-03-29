@@ -76,7 +76,7 @@ type AtlasCacheData = { rects: typeof assetState[ "blockItmesAtlasMeta" ], data:
 
 const minecraftTargetJar = "https://piston-data.mojang.com/v1/objects/d3bdf582a7fa723ce199f3665588dcfe6bf9aca8/client.jar";
 
-export const assetPipeline = new URL(`${location.hostname === "localhost" ? "http://localhost:8000" : "https://asset-pipeline.lucsoft.de/"}?${new URLSearchParams({ url: minecraftTargetJar })}`);
+const assetPipeline = new URL(`${location.hostname === "localhost" ? "http://localhost:8000" : "https://asset-pipeline.lucsoft.de/"}?${new URLSearchParams({ url: minecraftTargetJar })}`);
 
 export async function loadAssets() {
     const requestMetadata = await fetch(assetPipeline);
@@ -104,6 +104,12 @@ export async function loadAssets() {
 
     assetState.loaded = true;
 }
+
+export const textureUrl = memoize((name: string) => {
+    const url = new URL(assetPipeline);
+    url.searchParams.set("file", `assets/minecraft/textures/${name}.png`);
+    return new BABYLON.Texture(url.toString(), null, false, false, BABYLON.Texture.NEAREST_SAMPLINGMODE);
+});
 
 export function normalizeName(name: string) {
     return name.startsWith("minecraft:") ? name : `minecraft:${name}`;

@@ -1,5 +1,5 @@
 import * as BABYLON from "@babylonjs/core";
-import { assetPipeline } from "./assets.ts";
+import { textureUrl } from "./assets.ts";
 
 // Day cycle: 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset, 1 = midnight
 // Speed: one full day every 20 minutes (real Minecraft default)
@@ -159,9 +159,6 @@ export function createSkyDome(scene: BABYLON.Scene): void {
     sunMesh.infiniteDistance = true;
 
 
-    const sunUrl = new URL(assetPipeline);
-    sunUrl.searchParams.set("file", "assets/minecraft/textures/environment/sun.png");
-    const sunTexture = new BABYLON.Texture(sunUrl.toString(), scene, false, false, BABYLON.Texture.NEAREST_SAMPLINGMODE);
 
     sunMaterial = new BABYLON.ShaderMaterial("sunMat", scene, { vertex: "sun", fragment: "sun" }, {
         attributes: [ "position", "uv" ],
@@ -170,7 +167,7 @@ export function createSkyDome(scene: BABYLON.Scene): void {
         needAlphaBlending: true,
     });
     sunMaterial.alphaMode = BABYLON.Engine.ALPHA_ADD;
-    sunMaterial.setTexture("sunTexture", sunTexture);
+    sunMaterial.setTexture("sunTexture", textureUrl("environment/sun"));
     sunMaterial.setVector3("tint", new BABYLON.Vector3(1, 1, 1));
     sunMaterial.backFaceCulling = false;
     sunMaterial.disableDepthWrite = true;
@@ -183,10 +180,6 @@ export function createSkyDome(scene: BABYLON.Scene): void {
     moonMesh.isPickable = false;
     moonMesh.infiniteDistance = true;
 
-    const moonUrl = new URL(assetPipeline);
-    moonUrl.searchParams.set("file", "assets/minecraft/textures/environment/moon_phases.png");
-    const moonTexture = new BABYLON.Texture(moonUrl.toString(), scene, false, false, BABYLON.Texture.NEAREST_SAMPLINGMODE);
-
     moonMaterial = new BABYLON.ShaderMaterial("moonMat", scene, { vertex: "sun", fragment: "moon" }, {
         attributes: [ "position", "uv" ],
         uniforms: [ "worldViewProjection", "phaseOffset" ],
@@ -194,7 +187,7 @@ export function createSkyDome(scene: BABYLON.Scene): void {
         needAlphaBlending: true,
     });
     moonMaterial.alphaMode = BABYLON.Engine.ALPHA_ADD;
-    moonMaterial.setTexture("moonTexture", moonTexture);
+    moonMaterial.setTexture("moonTexture", textureUrl("environment/moon_phases"));
     moonMaterial.setVector2("phaseOffset", new BABYLON.Vector2(0, 0));
     moonMaterial.backFaceCulling = false;
     moonMaterial.disableDepthWrite = true;

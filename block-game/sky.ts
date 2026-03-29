@@ -3,7 +3,7 @@ import { assetPipeline } from "./assets.ts";
 
 // Day cycle: 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset, 1 = midnight
 // Speed: one full day every 20 minutes (real Minecraft default)
-const DAY_DURATION_SECONDS = 20 * 60;
+const DAY_DURATION_SECONDS = 25 * 60;
 
 // [time 0-1, r, g, b]
 const ZENITH_KEYFRAMES: [ number, number, number, number ][] = [

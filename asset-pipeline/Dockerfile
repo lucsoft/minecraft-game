@@ -6,9 +6,9 @@ copy deno.lock .
 
 run deno install --frozen
 
-copy asset-cdn ./asset-cdn
+copy asset-pipeline ./asset-pipeline
 
-run deno compile --cached-only --output /server -A --unstable-kv ./asset-cdn/mod.ts
+run deno compile --cached-only --output /server -A --unstable-kv ./asset-pipeline/mod.ts
 
 from denoland/deno:2.7.6
 

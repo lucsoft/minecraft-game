@@ -1,8 +1,8 @@
 services:
-  assert-cdn:
+  asset-pipeline:
     build:
       context: .
-      dockerfile: ./asset-cdn/Dockerfile
+      dockerfile: ./asset-pipeline/Dockerfile
       platforms:
         - linux/amd64
     image: ghcr.io/lucsoft/asset-cdn

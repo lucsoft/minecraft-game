@@ -2,12 +2,12 @@ import { soundFileUrl } from "../asset-pipeline-url.ts";
 
 /**
  * Minecraft's own sounds, pulled through the asset pipeline. Everything is kept quiet and
- * short so a long session stays pleasant: sand steps for a shot, an experience orb that
- * climbs with the tier for a merge, and the level up jingle when an order is served.
+ * short so a long session stays pleasant: a fishing-rod style whoosh for a shot, an
+ * experience orb that climbs with the tier for a merge, and the level up jingle for an order.
  */
 const MASTER = 0.5;
 
-const SLIDE = [ "step/sand1", "step/sand2", "step/sand3", "step/sand4" ];
+const THROW = "entity/bobber/castfast";
 const MERGE = "random/orb";
 const DELIVER = "random/levelup";
 const ROUND = "ui/toast/challenge_complete";
@@ -33,7 +33,7 @@ export function unlockAudio() {
         return;
     }
     context = new AudioContext();
-    for (const name of [ ...SLIDE, MERGE, DELIVER, ROUND ]) load(name);
+    for (const name of [ THROW, MERGE, DELIVER, ROUND ]) load(name);
 }
 
 function play(name: string, gain: number, rate = 1) {
@@ -49,8 +49,8 @@ function play(name: string, gain: number, rate = 1) {
 }
 
 export function playShoot() {
-    // a different grain of sand each time, so repeated shots do not grate
-    play(SLIDE[ Math.floor(Math.random() * SLIDE.length) ], 0.9, 0.9 + Math.random() * 0.2);
+    // slight pitch drift so repeated shots do not grate
+    play(THROW, 0.7, 0.92 + Math.random() * 0.16);
 }
 
 export function playMerge(tier: number) {

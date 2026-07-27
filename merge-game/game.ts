@@ -62,6 +62,9 @@ export interface GameState {
     drag: Drag | null;
     /** number of shots taken, used to hide the swipe hint */
     shots: number;
+    /** merge tally and the tier the last one produced, for sound and effects */
+    merges: number;
+    lastMergeTier: number;
     banner: { text: string; life: number; } | null;
     over: boolean;
     cooldown: number;
@@ -81,6 +84,8 @@ export function createGame(): GameState {
         flights: [],
         drag: null,
         shots: 0,
+        merges: 0,
+        lastMergeTier: 0,
         banner: null,
         over: false,
         cooldown: 0,
@@ -232,6 +237,8 @@ function merge(state: GameState, a: Item, b: Item) {
         merging: false,
     };
 
+    state.merges++;
+    state.lastMergeTier = tier;
     state.highestTier = Math.max(state.highestTier, tier);
     state.coins += itemTiers[ tier ].coins;
     state.texts.push({ x: merged.x, y: merged.y, text: `+${itemTiers[ tier ].coins}`, color: "#ffffff", life: 0.9 });

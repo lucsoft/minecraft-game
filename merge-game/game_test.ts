@@ -240,3 +240,12 @@ Deno.test("the three objectives of a round ask for different items", () => {
         assertEquals(new Set(tiers).size, tiers.length);
     }
 });
+
+Deno.test("merges are tallied for effects and sound", () => {
+    const state = createGame();
+    place(state, 1, 50, 100);
+    place(state, 1, 56, 100);
+    run(state, 0.2);
+    assertEquals(state.merges, 1);
+    assertEquals(state.lastMergeTier, 2);
+});

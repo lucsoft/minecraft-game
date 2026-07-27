@@ -9,7 +9,8 @@ const MASTER = 0.5;
 
 const THROW = "entity/bobber/castfast";
 const MERGE = "random/orb";
-const DELIVER = "random/levelup";
+const DELIVER = "note/bell";
+const DELIVER_CHORD = [ 1, 1.26, 1.5 ];
 const ROUND = "ui/toast/challenge_complete";
 
 let context: AudioContext | undefined;
@@ -36,7 +37,7 @@ export function unlockAudio() {
     for (const name of [ THROW, MERGE, DELIVER, ROUND ]) load(name);
 }
 
-function play(name: string, gain: number, rate = 1) {
+function play(name: string, gain: number, rate = 1, delay = 0) {
     const buffer = buffers.get(name);
     if (!context || !buffer) return;
     const source = context.createBufferSource();
@@ -45,7 +46,7 @@ function play(name: string, gain: number, rate = 1) {
     const volume = context.createGain();
     volume.gain.value = MASTER * gain;
     source.connect(volume).connect(context.destination);
-    source.start();
+    source.start(context.currentTime + delay);
 }
 
 export function playShoot() {
@@ -58,7 +59,10 @@ export function playMerge(tier: number) {
 }
 
 export function playDeliver() {
-    play(DELIVER, 0.5);
+    // a small rising bell chord, so serving an order feels like being paid
+    for (const [ index, step ] of DELIVER_CHORD.entries()) {
+        play(DELIVER, 0.5 - index * 0.06, step, index * 0.085);
+    }
 }
 
 export function playRound() {

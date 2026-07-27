@@ -18,3 +18,17 @@ export function soundFileUrl(name: string) {
     url.searchParams.set("sound", name);
     return url.toString();
 }
+
+/** every sound file of the version together with the events that play it */
+export function soundListUrl() {
+    const url = new URL(assetPipeline);
+    url.searchParams.set("soundlist", "");
+    return url.toString();
+}
+
+/** newline delimited analysis rows, streamed as the pipeline works through the files */
+export function soundFeaturesUrl() {
+    const url = new URL(assetPipeline);
+    url.searchParams.set("soundfeatures", "");
+    return url.toString();
+}

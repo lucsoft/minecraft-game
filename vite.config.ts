@@ -38,7 +38,9 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 main: "index.html",
-                merge: "merge.html"
+                merge: "merge.html",
+                // its own folder so the page is served at /sound rather than /sound.html
+                sound: "sound/index.html"
             }
         }
     }

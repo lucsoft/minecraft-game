@@ -20,6 +20,12 @@ The pipeline fetches and caches ZIP archives, collects mcmeta files within them,
 Sounds live in the version's asset objects rather than the jar, so the pipeline resolves them
 through the asset index and caches each file on first use.
 
+## Pages
+
+- `/` — the block renderer
+- `/merge` — the merge game
+- `/sound` — every sound of the version as a graph, wired up by how alike they actually sound
+
 ## Sound analysis
 
 `soundfeatures` decodes each ogg and reduces it to MFCCs plus the usual spectral and envelope

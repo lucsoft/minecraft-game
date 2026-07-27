@@ -132,6 +132,55 @@ async function ensureAtlas(files: string[], objectId: string) {
     await kv.set([ "atlas", "v0", objectId ], true);
 }
 
+const versionManifestUrl = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+const assetObjectsUrl = "https://resources.download.minecraft.net";
+/** sounds are not shipped in the jar, they live in the asset objects of the matching version */
+interface AssetIndex {
+    objects: Record<string, { hash: string; size: number; }>;
+}
+
+async function findAssetIndex(objectId: string) {
+    const manifest = await fetch(versionManifestUrl).then(response => response.json()) as { versions: { id: string, url: string; }[]; };
+    const batchSize = 16;
+    // the newest versions come first, so a current jar is found within a batch or two
+    for (let offset = 0; offset < Math.min(manifest.versions.length, 320); offset += batchSize) {
+        const batch = await Promise.all(manifest.versions.slice(offset, offset + batchSize).map(async (version) => {
+            const response = await fetch(version.url);
+            // deno-lint-ignore no-explicit-any
+            return response.ok ? await response.json() as any : null;
+        }));
+        const match = batch.find(version => version?.downloads?.client?.url?.includes(objectId));
+        if (!match) continue;
+        console.log(`[INFO] objectId ${objectId} is Minecraft ${match.id}, assets ${match.assetIndex.id}`);
+        return await fetch(match.assetIndex.url).then(response => response.json()) as AssetIndex;
+    }
+    throw new Error(`No Minecraft version ships the client jar ${objectId}`);
+}
+
+const assetIndex = memoize(async (objectId: string) => {
+    const path = `./cache/${objectId}/asset-index.json`;
+    if (!await exists(path, { isFile: true })) {
+        await ensureDir(dirname(path));
+        await Deno.writeTextFile(path, JSON.stringify(await findAssetIndex(objectId)));
+    }
+    return JSON.parse(await Deno.readTextFile(path)) as AssetIndex;
+}, { cache: new LruCache<string, MemoizationCacheResult<Promise<AssetIndex>>>(4) });
+
+/** downloads an asset object on first use and keeps it next to the rest of the cache */
+async function ensureAssetObject(objectId: string, name: string) {
+    const index = await assetIndex(objectId);
+    const object = index.objects[ name ];
+    if (!object) return null;
+    const path = `./cache/${objectId}/objects/${name}`;
+    if (!await exists(path, { isFile: true })) {
+        const response = await fetch(`${assetObjectsUrl}/${object.hash.slice(0, 2)}/${object.hash}`);
+        if (!response.ok) throw new Error(`Failed to fetch asset ${name}: ${response.statusText}`);
+        await ensureDir(dirname(path));
+        await Deno.writeFile(path, await response.bytes());
+    }
+    return path;
+}
+
 function respond(rsp: Response) {
     rsp.headers.set("Access-Control-Allow-Origin", "*");
     rsp.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -149,6 +198,20 @@ Deno.serve(async (req) => {
 
     const objectId = url.searchParams.get("url")?.match(validUrlPattern)?.groups?.objectId;
     if (!objectId) return respond(new Response("Invalid URL", { status: 400 }));
+
+    // sounds only need the asset index, so they are served before the jar is unpacked
+    if (url.searchParams.has("sounds")) {
+        const path = await ensureAssetObject(objectId, "minecraft/sounds.json");
+        if (!path) return respond(new Response("No sound index", { status: 404 }));
+        return respond(await serveFile(req, path));
+    }
+    if (url.searchParams.has("sound")) {
+        const name = url.searchParams.get("sound")!.replace(/\.ogg$/, "");
+        if (!/^[a-z0-9_]+(\/[a-z0-9_]+)*$/.test(name)) return respond(new Response("Invalid sound name", { status: 400 }));
+        const path = await ensureAssetObject(objectId, `minecraft/sounds/${name}.ogg`);
+        if (!path) return respond(new Response("Sound not found", { status: 404 }));
+        return respond(await serveFile(req, path));
+    }
 
     await ensureCache(objectId, url);
 

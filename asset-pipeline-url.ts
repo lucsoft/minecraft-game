@@ -11,3 +11,10 @@ export function assetFileUrl(file: string) {
 export function textureFileUrl(name: string) {
     return assetFileUrl(`assets/minecraft/textures/${name}.png`);
 }
+
+/** sounds come from the version's asset objects, the pipeline resolves and caches them */
+export function soundFileUrl(name: string) {
+    const url = new URL(assetPipeline);
+    url.searchParams.set("sound", name);
+    return url.toString();
+}

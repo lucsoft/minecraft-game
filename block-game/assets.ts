@@ -3,6 +3,7 @@ import { assert } from "@std/assert";
 import { memoize } from "@std/cache";
 import { decodeCbor } from "@std/cbor";
 import { deepMerge } from "@std/collections";
+import { assetPipeline, textureFileUrl } from "../asset-pipeline-url.ts";
 
 interface MinecraftTexture {
     texture: BABYLON.Texture;
@@ -74,10 +75,6 @@ export const assetState = {
 };
 type AtlasCacheData = { rects: typeof assetState[ "blockItmesAtlasMeta" ], data: Uint8Array; width: number, height: number; };
 
-const minecraftTargetJar = "https://piston-data.mojang.com/v1/objects/d3bdf582a7fa723ce199f3665588dcfe6bf9aca8/client.jar";
-
-const assetPipeline = new URL(`${location.hostname === "localhost" ? "http://localhost:8000" : "https://asset-pipeline.lucsoft.de/"}?${new URLSearchParams({ url: minecraftTargetJar })}`);
-
 export async function loadAssets() {
     const requestMetadata = await fetch(assetPipeline);
     assert(requestMetadata.ok, "Failed to load assets: " + requestMetadata.statusText);
@@ -106,9 +103,7 @@ export async function loadAssets() {
 }
 
 export const textureUrl = memoize((name: string) => {
-    const url = new URL(assetPipeline);
-    url.searchParams.set("file", `assets/minecraft/textures/${name}.png`);
-    return new BABYLON.Texture(url.toString(), null, false, false, BABYLON.Texture.NEAREST_SAMPLINGMODE);
+    return new BABYLON.Texture(textureFileUrl(name), null, false, false, BABYLON.Texture.NEAREST_SAMPLINGMODE);
 });
 
 export function normalizeName(name: string) {

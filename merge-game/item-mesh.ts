@@ -4,18 +4,19 @@ import { textureFileUrl } from "../asset-pipeline-url.ts";
 const ALPHA_THRESHOLD = 8;
 /** how many texels deep an item is, vanilla dropped items are one */
 const THICKNESS_TEXELS = 2;
-const SHADOW_RESOLUTION = 64;
-/** penumbra in shadow-texture pixels: crisp where the item touches, soft at the far end */
-const SHADOW_BLUR_NEAR = 1;
-const SHADOW_BLUR_FAR = 7;
+/** shadow texture pixels per sprite texel, so the grids line up and stay pixel art */
+const SHADOW_UPSCALE = 6;
+/** penumbra in sprite texels: none where the item touches the sand, soft at the far end */
+const SHADOW_BLUR_NEAR = 0;
+const SHADOW_BLUR_FAR = 2.6;
 const SHADOW_ALPHA_NEAR = 0.8;
 const SHADOW_ALPHA_FAR = 0.3;
 /** the blur thins the silhouette out, this puts the weight back without losing the gradient */
 const SHADOW_GAIN = 1.8;
 /** the penumbra fans out sideways as well, so the far end of the shadow is wider */
 const SHADOW_SPREAD = 1.35;
-/** margin around the sprite inside the shadow texture, so the blur has room to bleed */
-const SHADOW_PADDING = 0.2;
+/** margin around the sprite inside the shadow texture, in sprite texels */
+const SHADOW_PADDING_TEXELS = 4;
 
 export interface AlphaMask {
     width: number;
@@ -125,12 +126,13 @@ export function buildShadowMesh(name: string, size: number, lean: number, drift:
     const reachX = drift.x * height;
     const reachZ = half * Math.sin(lean) + drift.y * height - nearZ;
     // the quad covers the padded texture, so the blurred edges are not clipped
-    const nearHalf = half + SHADOW_PADDING * size;
-    const farHalf = half * SHADOW_SPREAD + SHADOW_PADDING * size * SHADOW_SPREAD;
-    const nearOffsetX = -SHADOW_PADDING * reachX;
-    const nearOffsetZ = nearZ - SHADOW_PADDING * reachZ;
-    const farOffsetX = reachX * (1 + SHADOW_PADDING);
-    const farOffsetZ = nearZ + reachZ * (1 + SHADOW_PADDING);
+    const padding = SHADOW_PADDING_TEXELS / 16;
+    const nearHalf = half + padding * size;
+    const farHalf = half * SHADOW_SPREAD + padding * size * SHADOW_SPREAD;
+    const nearOffsetX = -padding * reachX;
+    const nearOffsetZ = nearZ - padding * reachZ;
+    const farOffsetX = reachX * (1 + padding);
+    const farOffsetZ = nearZ + reachZ * (1 + padding);
     const mesh = new BABYLON.Mesh(`shade:${name}`, scene);
     const vertexData = new BABYLON.VertexData();
     vertexData.positions = [
@@ -152,27 +154,27 @@ export function buildShadowMesh(name: string, size: number, lean: number, drift:
  * from the item's feet, the way a real penumbra spreads the further the shadow is thrown.
  */
 export function buildShadowTexture(name: string, mask: AlphaMask, scene: BABYLON.Scene) {
-    const size = SHADOW_RESOLUTION;
+    const texels = mask.width + SHADOW_PADDING_TEXELS * 2;
+    const size = texels * SHADOW_UPSCALE;
     const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
-    // texture space includes a margin, this maps it back onto the sprite
-    const spriteAt = (pixel: number) => ((pixel + 0.5) / size - SHADOW_PADDING) / (1 - 2 * SHADOW_PADDING);
+    // texture space carries a margin, this maps a pixel back onto a sprite texel
+    const texelAt = (pixel: number) => Math.floor(pixel / SHADOW_UPSCALE) - SHADOW_PADDING_TEXELS;
     // the top of the sprite lands furthest from the item, its feet touch the ground
-    const distanceOf = (row: number) => Math.min(1, Math.max(0, 1 - spriteAt(row)));
+    const distanceOf = (row: number) => Math.min(1, Math.max(0, 1 - (texelAt(row) + 0.5) / mask.height));
 
     const coverage = new Float32Array(size * size);
     for (let row = 0; row < size; row++) {
-        const spriteRow = spriteAt(row);
-        if (spriteRow < 0 || spriteRow >= 1) continue;
-        const maskRow = Math.floor(spriteRow * mask.height);
+        const maskRow = texelAt(row);
+        if (maskRow < 0 || maskRow >= mask.height) continue;
         for (let col = 0; col < size; col++) {
-            const spriteCol = spriteAt(col);
-            if (spriteCol < 0 || spriteCol >= 1) continue;
-            const maskCol = Math.floor(spriteCol * mask.width);
+            const maskCol = texelAt(col);
+            if (maskCol < 0 || maskCol >= mask.width) continue;
             coverage[ row * size + col ] = mask.alpha[ maskRow * mask.width + maskCol ] > ALPHA_THRESHOLD ? 1 : 0;
         }
     }
 
-    const radiusOf = (row: number) => Math.round(lerp(SHADOW_BLUR_NEAR, SHADOW_BLUR_FAR, distanceOf(row)));
+    // radius zero keeps the near rows exactly on the texel grid, so they stay crisp pixels
+    const radiusOf = (row: number) => Math.round(lerp(SHADOW_BLUR_NEAR, SHADOW_BLUR_FAR, distanceOf(row)) * SHADOW_UPSCALE);
     const blurred = new Float32Array(size * size);
     const spread = new Float32Array(size * size);
     for (let row = 0; row < size; row++) {
@@ -198,7 +200,8 @@ export function buildShadowTexture(name: string, mask: AlphaMask, scene: BABYLON
         }
     }
 
-    const texture = new BABYLON.DynamicTexture(`shade:${name}`, { width: size, height: size }, scene, true);
+    // nearest sampling with no mips: the crisp end has to look like the sprite it comes from
+    const texture = new BABYLON.DynamicTexture(`shade:${name}`, { width: size, height: size }, scene, false, BABYLON.Texture.NEAREST_SAMPLINGMODE);
     const context = texture.getContext() as unknown as CanvasRenderingContext2D;
     const image = context.createImageData(size, size);
     for (let row = 0; row < size; row++) {

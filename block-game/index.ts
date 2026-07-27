@@ -1,5 +1,6 @@
 import * as BABYLON from "@babylonjs/core";
 import { assert } from "@std/assert";
+import { createPig } from "./animal.ts";
 import './assets.ts';
 import { assetState, getMinecraftMaterialFromName, loadAssets, minecraftBlockstates, normalizeName } from "./assets.ts";
 import { isEmptyModel, isSolidBlock } from "./bakeing.ts";
@@ -7,19 +8,18 @@ import { setupCamera, setupCameraInput, tickCamera } from "./camera.ts";
 import { renderChunk } from "./chunk.ts";
 import { createEntity, setControlledEntity } from "./entities.ts";
 import { createSkyDome, tickSky } from "./sky.ts";
-import { computedChunks, range, rawChunks } from "./utils.ts";
+import { computedChunks, positionToChunkId, positionToGlobalLocation, range, rawChunks } from "./utils.ts";
 import { Chunk, CHUNK_SIZE, debugMutateChunk, generateWorld, getIndexFromLocalBlock } from "./world.ts";
 
 const CHUNK_Y_BLOCK_OFFSET = 0 * CHUNK_SIZE;
 const chunkMap = new Map<string, Chunk>();
 
 function isBlockSolid(bx: number, by: number, bz: number): boolean {
-    const chunkX = Math.floor(bx / CHUNK_SIZE);
-    const chunkZ = Math.floor(bz / CHUNK_SIZE);
-    const chunk = chunkMap.get(`${chunkX},${chunkZ}`);
+    const chunkPos = positionToChunkId({ x: bx, y: by, z: bz });
+    const chunk = chunkMap.get(`${chunkPos.x},${chunkPos.z}`);
     if (!chunk) return false;
-    const localX = bx - chunkX * CHUNK_SIZE;
-    const localZ = bz - chunkZ * CHUNK_SIZE;
+    const localX = bx - chunkPos.x * CHUNK_SIZE;
+    const localZ = bz - chunkPos.z * CHUNK_SIZE;
     const localY = by - CHUNK_Y_BLOCK_OFFSET;
     const worldHeight = chunk.blocks.length / (CHUNK_SIZE * CHUNK_SIZE);
     if (localY < 0 || localY >= worldHeight) return false;
@@ -55,6 +55,9 @@ async function startGame() {
         }
     }
 
+    const pig = createPig();
+
+    pig.position.y = 75 * 16;
 
     const chunk = chunkMap.get("0,0");
     const blockStates = minecraftBlockstates.entries()
@@ -149,11 +152,7 @@ engine.runRenderLoop(() => {
     tickCamera(camera, dt, isBlockSolid);
     tickSky(dt, scene, light);
 
-    const pos = camera.position;
-    const bx = Math.floor(pos.x / CHUNK_SIZE);
-    const by = Math.floor(pos.y / CHUNK_SIZE);
-    const bz = Math.floor(pos.z / CHUNK_SIZE);
-    const chunkX = Math.floor(bx / CHUNK_SIZE);
-    const chunkZ = Math.floor(bz / CHUNK_SIZE);
-    debugEl.textContent = `pos   ${bx}, ${by}, ${bz}\nchunk ${chunkX},${chunkZ}`;
+    const blockPos = positionToGlobalLocation(camera.position);
+    const chunkPos = positionToChunkId(blockPos);
+    debugEl.textContent = `pos   ${blockPos.x}, ${blockPos.y}, ${blockPos.z}\nchunk ${chunkPos.x},${chunkPos.z}`;
 });

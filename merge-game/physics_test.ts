@@ -24,10 +24,10 @@ Deno.test("a sliding item loses speed and comes to a stop", () => {
 });
 
 Deno.test("a full power shot glides to the far end of the tray", () => {
-    const sliding = item(0, 50, 158, 0, -315);
+    const sliding = item(0, 50, 165, 0, -350);
     step([ sliding ], 6);
     assertEquals(speedOf(sliding), 0);
-    assertLess(sliding.y, 22);
+    assertLess(sliding.y, 14);
 });
 
 Deno.test("a resting item only creeps when it is nudged", () => {
@@ -86,4 +86,25 @@ Deno.test("stacked items with identical positions are separated", () => {
     const b = item(3, 50, 100);
     step([ a, b ], 0.5);
     assertGreater(Math.hypot(b.x - a.x, b.y - a.y), 1);
+});
+
+Deno.test("size changes the grip at a standstill, not how far a shot glides", () => {
+    const glide = [ 0, MAX_TIER ].map(tier => {
+        const sliding = item(tier, 50, 158, 0, -240);
+        step([ sliding ], 6);
+        assertEquals(speedOf(sliding), 0);
+        return 158 - sliding.y;
+    });
+    assertLess(Math.abs(glide[ 0 ] - glide[ 1 ]), 10);
+
+    const creep = [ 0, 3, MAX_TIER ].map(tier => {
+        const nudged = item(tier, 50, 100, 0, -20);
+        step([ nudged ], 3);
+        return 100 - nudged.y;
+    });
+    for (let index = 1; index < creep.length; index++) {
+        assertLess(creep[ index ], creep[ index - 1 ]);
+    }
+    // a soft nudge pushes the smallest item more than twice as far as the biggest
+    assertGreater(creep[ 0 ], creep.at(-1)! * 2);
 });

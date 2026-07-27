@@ -102,11 +102,13 @@ Deno.test("a sideways slide only picks the lane, it never angles the shot", () =
     }
 });
 
-Deno.test("a launched item clears the serving line", () => {
+Deno.test("a launched item carries all the way to the far end", () => {
     const state = createGame();
     slide(state, 50);
-    run(state, 4);
+    run(state, 5);
     assertLess(state.items[ 0 ].y, BOARD.lineY);
+    // it should end up against the far rail, not somewhere in the middle
+    assertLess(state.items[ 0 ].y, 25);
 });
 
 Deno.test("only a short reload blocks the next shot, sliding items do not", () => {
@@ -133,6 +135,20 @@ Deno.test("two touching items merge into the next tier and pay out", () => {
     assertEquals(state.coins, itemTiers[ 2 ].coins);
     assertEquals(state.highestTier, 2);
     assertGreater(state.texts.length, 0);
+});
+
+Deno.test("a merge passes on the momentum that went into it, plus a small reward", () => {
+    const state = createGame();
+    const resting = place(state, 1, 50, 100);
+    resting.settled = true;
+    const incoming = place(state, 1, 50, 100 + radiusOf(1) * 1.9);
+    incoming.vy = -100;
+    run(state, 1 / 60);
+    assertEquals(state.items.length, 1);
+    const merged = state.items[ 0 ];
+    // half of 100 shared between the two halves, then the 20% merge boost
+    assertAlmostEquals(merged.vy, -60, 4);
+    assertLess(merged.vy, incoming.vy / 2);
 });
 
 Deno.test("merging the ordered item completes that objective and pays the reward", () => {

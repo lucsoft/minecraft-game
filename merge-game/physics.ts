@@ -37,6 +37,12 @@ const ITEM_RESTITUTION = 0.42;
 
 /** collision radius, a bit tighter than the sprite so items can nestle together */
 export const radiusOf = (tier: number) => itemTiers[ tier ].radius * HITBOX_SCALE;
+
+/**
+ * Only the standstill grip scales with size: every item glides the same, but once one is
+ * barely moving a netherite ingot digs into the sand where a lump of coal still skates.
+ */
+export const gripOf = (tier: number) => (itemTiers[ tier ].radius / itemTiers[ 0 ].radius) ** 0.6;
 export const massOf = (tier: number) => radiusOf(tier) ** 2;
 export const speedOf = (item: Item) => Math.hypot(item.vx, item.vy);
 
@@ -59,13 +65,12 @@ export function stepPhysics(items: Item[], board: Board, dt: number): [ Item, It
 }
 
 function integrate(items: Item[], board: Board, dt: number) {
-    const glide = Math.exp(-DAMPING * dt);
-    const creep = Math.exp(-CREEP_DAMPING * dt);
     const spinDecay = Math.exp(-SPIN_DAMPING * dt);
     for (const item of items) {
         item.x += item.vx * dt;
         item.y += item.vy * dt;
-        const decay = speedOf(item) < CREEP_SPEED ? creep : glide;
+        const friction = speedOf(item) < CREEP_SPEED ? CREEP_DAMPING * gripOf(item.tier) : DAMPING;
+        const decay = Math.exp(-friction * dt);
         item.vx *= decay;
         item.vy *= decay;
         item.angle += item.spin * dt;

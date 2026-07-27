@@ -1,5 +1,5 @@
 import { itemTiers, MAX_TIER } from "./items.ts";
-import { Board, Item, radiusOf, stepPhysics } from "./physics.ts";
+import { Board, Item, massOf, radiusOf, stepPhysics } from "./physics.ts";
 
 export const BOARD: Board = { width: 100, height: 176, lineY: 154 };
 /** resting spot of the item waiting to be flicked */
@@ -8,11 +8,14 @@ export const LAUNCHER = { x: 50, y: 165 };
 const MAX_ITEMS = 42;
 const MAX_SPILLED = 3;
 const LAUNCH_COOLDOWN = 0.28;
-const LAUNCH_SPEED = 315;
+/** fast enough that a shot carries all the way to the far rail */
+const LAUNCH_SPEED = 350;
 const ORDER_COUNT = 3;
 /** what drops into the launcher: mostly coal, some redstone, copper is a treat */
 const SPAWN_WEIGHTS: [ tier: number, chance: number ][] = [ [ 0, 0.65 ], [ 1, 0.3 ], [ 2, 0.05 ] ];
 const MAX_SPAWN_TIER = 2;
+/** a merge hands its momentum to the new item and adds a little on top as a reward */
+const MERGE_BOOST = 1.2;
 
 export interface Order {
     tier: number;
@@ -211,15 +214,19 @@ export function updateGame(state: GameState, dt: number) {
 function merge(state: GameState, a: Item, b: Item) {
     const tier = a.tier + 1;
     const radius = radiusOf(tier);
+    // momentum of both halves carries into the new item, the bigger item now drags more sand
+    const massA = massOf(a.tier);
+    const massB = massOf(b.tier);
+    const total = massA + massB;
     const merged: Item = {
         id: state.nextId++,
         tier,
         x: Math.min(BOARD.width - radius, Math.max(radius, (a.x + b.x) / 2)),
         y: Math.min(BOARD.height - radius, Math.max(radius, (a.y + b.y) / 2)),
-        vx: (a.vx + b.vx) * 0.35,
-        vy: (a.vy + b.vy) * 0.35,
+        vx: ((a.vx * massA + b.vx * massB) / total) * MERGE_BOOST,
+        vy: ((a.vy * massA + b.vy * massB) / total) * MERGE_BOOST,
         angle: 0,
-        spin: (a.spin + b.spin) * 0.5,
+        spin: ((a.spin * massA + b.spin * massB) / total) * MERGE_BOOST,
         pop: 1,
         settled: false,
         merging: false,

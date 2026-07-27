@@ -274,3 +274,15 @@ Deno.test("merges are tallied for effects and sound", () => {
     assertEquals(state.merges, 1);
     assertEquals(state.lastMergeTier, 2);
 });
+
+Deno.test("the spill count is published for the warning colours", () => {
+    const state = createGame();
+    assertEquals(state.spilled, 0);
+    place(state, 0, 20, BOARD.height - 20).settled = true;
+    run(state, 0.2);
+    assertEquals(state.spilled, 1);
+    place(state, 0, 55, BOARD.height - 20).settled = true;
+    run(state, 0.2);
+    assertEquals(state.spilled, 2);
+    assertFalse(state.over);
+});

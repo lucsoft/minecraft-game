@@ -6,7 +6,7 @@ export const BOARD: Board = { width: 100, height: 176, lineY: 154 };
 export const LAUNCHER = { x: 50, y: 165 };
 
 /** the one way to lose: this many items coming to rest in the serving zone */
-const MAX_SPILLED = 3;
+export const MAX_SPILLED = 3;
 const LAUNCH_COOLDOWN = 0.28;
 /** fast enough that a shot carries all the way to the far rail */
 const LAUNCH_SPEED = 350;
@@ -66,6 +66,8 @@ export interface GameState {
     merges: number;
     lastMergeTier: number;
     banner: { text: string; life: number; } | null;
+    /** items at rest in the serving zone, drives the warning colours */
+    spilled: number;
     over: boolean;
     cooldown: number;
     nextId: number;
@@ -87,6 +89,7 @@ export function createGame(): GameState {
         merges: 0,
         lastMergeTier: 0,
         banner: null,
+        spilled: 0,
         over: false,
         cooldown: 0,
         nextId: 0,
@@ -212,8 +215,8 @@ export function updateGame(state: GameState, dt: number) {
     state.items = state.items.filter(item => !item.merging);
 
     // however busy the tray gets, only a blocked serving zone ends the run
-    const spilled = state.items.filter(item => item.settled && item.y > BOARD.lineY).length;
-    if (spilled >= MAX_SPILLED) state.over = true;
+    state.spilled = state.items.filter(item => item.settled && item.y > BOARD.lineY).length;
+    if (state.spilled >= MAX_SPILLED) state.over = true;
 }
 
 function merge(state: GameState, a: Item, b: Item) {

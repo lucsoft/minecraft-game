@@ -1,5 +1,5 @@
 import * as BABYLON from "@babylonjs/core";
-import { BOARD, GameState, launcherPosition } from "./game.ts";
+import { BOARD, GameState, launcherPosition, MAX_SPILLED } from "./game.ts";
 import { speedOf } from "./physics.ts";
 import { buildItemMesh, buildShadowMesh, buildShadowTexture, loadAlphaMask } from "./item-mesh.ts";
 import { backgroundPalette, boardTextures, itemTiers, randomlyRotated } from "./items.ts";
@@ -56,7 +56,7 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
     sun.position = new BABYLON.Vector3(-70, 170, 150);
     sun.intensity = 0.85;
 
-    buildTray(scene);
+    const zoneMaterial = buildTray(scene);
 
     const masks = await Promise.all(itemTiers.map(tier => loadAlphaMask(tier.texture)));
     const templates = itemTiers.map((tier, index) => {
@@ -175,6 +175,19 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
         launcher.mesh.isVisible = !state.over;
         launcher.shade.isVisible = !state.over;
         placeShade(launcher, toWorldX(spot.x), toWorldZ(spot.y), hover, 0, 0, dt);
+
+        // the serving zone warns before it is lost: a red wash for the first item, a pulse for the last
+        const danger = Math.min(state.spilled, MAX_SPILLED - 1);
+        if (danger === 0) {
+            zoneMaterial.diffuseColor.set(0, 0, 0);
+            zoneMaterial.emissiveColor.set(0, 0, 0);
+            zoneMaterial.alpha = 0.16;
+        } else {
+            const pulse = danger >= MAX_SPILLED - 1 ? 0.62 + 0.38 * Math.sin(time * 7) : 1;
+            zoneMaterial.diffuseColor.set(0.85, 0.1, 0.08);
+            zoneMaterial.emissiveColor.set(0.3 * pulse, 0, 0);
+            zoneMaterial.alpha = (danger === 1 ? 0.24 : 0.42) * pulse;
+        }
 
         // a short guide line straight up the tray, shots never angle away from it
         aim.isVisible = state.drag !== null;
@@ -413,6 +426,7 @@ function wall(name: string, texture: string, scene: BABYLON.Scene, width: number
     return mesh;
 }
 
+/** returns the serving zone material, which turns red as the zone fills up */
 function buildTray(scene: BABYLON.Scene) {
     const table = scatteredFloor("table", backgroundPalette, scene, 620, 780, 1337);
     table.position.y = -RAIL_DROP;
@@ -468,4 +482,6 @@ function buildTray(scene: BABYLON.Scene) {
         dash.position.set(toWorldX((index + 0.5) * (BOARD.width / dashes)), 0.12, toWorldZ(BOARD.lineY));
         dash.material = dashMaterial;
     }
+
+    return zoneMaterial;
 }

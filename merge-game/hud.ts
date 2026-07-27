@@ -1,5 +1,5 @@
 import { textureFileUrl } from "../asset-pipeline-url.ts";
-import { FLIGHT_TIME, GameState } from "./game.ts";
+import { FLIGHT_TIME, GameState, MAX_SPILLED } from "./game.ts";
 import { boardTextures, itemTiers } from "./items.ts";
 
 const style = `
@@ -147,6 +147,23 @@ const style = `
     50% { opacity: .35; }
 }
 
+.hud .warning {
+    position: absolute;
+    left: 50%;
+    bottom: 78px;
+    transform: translateX(-50%);
+    font-size: 12px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    color: #ff9f8a;
+}
+
+.hud .warning.urgent {
+    font-size: 15px;
+    color: #ff5d45;
+    animation: hudPulse .7s ease-in-out infinite;
+}
+
 .hud .banner {
     position: absolute;
     left: 50%;
@@ -241,6 +258,7 @@ export function createHud(): Hud {
         </div>
         <div class="panel chain" data-chain></div>
         <div class="hint hidden" data-hint>SLIDE, RELEASE TO SHOOT</div>
+        <div class="warning hidden" data-warning></div>
         <div class="banner hidden" data-banner></div>
         <div class="floats" data-floats></div>
         <div class="flights" data-flights></div>
@@ -258,6 +276,7 @@ export function createHud(): Hud {
     const ordersEl = query<HTMLDivElement>("[data-orders]");
     const chainEl = query<HTMLDivElement>("[data-chain]");
     const hintEl = query<HTMLDivElement>("[data-hint]");
+    const warningEl = query<HTMLDivElement>("[data-warning]");
     const bannerEl = query<HTMLDivElement>("[data-banner]");
     const floatsEl = query<HTMLDivElement>("[data-floats]");
     const flightsEl = query<HTMLDivElement>("[data-flights]");
@@ -305,7 +324,17 @@ export function createHud(): Hud {
                 }).join("");
             }
 
-            hintEl.classList.toggle("hidden", state.shots > 2 || state.over);
+            // one item in the serving zone is a nudge, one short of losing is a real warning
+            const urgent = state.spilled >= MAX_SPILLED - 1;
+            warningEl.classList.toggle("hidden", state.spilled === 0 || state.over);
+            warningEl.classList.toggle("urgent", urgent);
+            if (state.spilled > 0) {
+                warningEl.textContent = urgent
+                    ? `SERVING ZONE ALMOST BLOCKED  ${state.spilled}/${MAX_SPILLED}`
+                    : `${state.spilled} ITEM IN THE SERVING ZONE`;
+            }
+
+            hintEl.classList.toggle("hidden", state.shots > 2 || state.over || state.spilled > 0);
             bannerEl.classList.toggle("hidden", !state.banner);
             if (state.banner) bannerEl.textContent = state.banner.text;
 

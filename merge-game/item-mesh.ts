@@ -99,3 +99,28 @@ export function buildItemMesh(name: string, size: number, mask: AlphaMask, scene
     vertexData.applyToMesh(mesh);
     return mesh;
 }
+
+/**
+ * Flat shadow for a standing sprite: the quad is sheared along `drift` (where the sun pushes
+ * the top of the item) so the silhouette keeps the same orientation as the item itself.
+ * The mesh starts at the item's base, so placing it needs no offset.
+ */
+export function buildShadowMesh(name: string, size: number, drift: BABYLON.Vector2, scene: BABYLON.Scene) {
+    const half = size / 2;
+    const reachX = drift.x * size;
+    const reachZ = drift.y * size;
+    const mesh = new BABYLON.Mesh(`shade:${name}`, scene);
+    const vertexData = new BABYLON.VertexData();
+    vertexData.positions = [
+        -half, 0, 0,
+        half, 0, 0,
+        half + reachX, 0, reachZ,
+        -half + reachX, 0, reachZ,
+    ];
+    vertexData.normals = [ 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0 ];
+    // u mirrored like the item faces, v running from the base of the sprite to its top
+    vertexData.uvs = [ 1, 0, 0, 0, 0, 1, 1, 1 ];
+    vertexData.indices = [ 0, 1, 2, 0, 2, 3 ];
+    vertexData.applyToMesh(mesh);
+    return mesh;
+}

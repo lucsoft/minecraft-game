@@ -22,9 +22,6 @@ export function silhouetteMaterial(name: string, scene: BABYLON.Scene) {
     const material = new BABYLON.StandardMaterial(`shade:${name}`, scene);
     const texture = pixelTexture(name, scene);
     texture.hasAlpha = true;
-    // mirrored to match the item, whose sprite also runs against world x
-    texture.uScale = -1;
-    texture.uOffset = 1;
     material.opacityTexture = texture;
     material.diffuseColor = new BABYLON.Color3(0, 0, 0);
     material.specularColor = new BABYLON.Color3(0, 0, 0);

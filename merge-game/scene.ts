@@ -1,7 +1,7 @@
 import * as BABYLON from "@babylonjs/core";
 import { BOARD, GameState, launcherPosition } from "./game.ts";
 import { speedOf } from "./physics.ts";
-import { buildItemMesh, loadAlphaMask } from "./item-mesh.ts";
+import { buildItemMesh, buildShadowMesh, loadAlphaMask } from "./item-mesh.ts";
 import { backgroundPalette, boardTextures, itemTiers, randomlyRotated } from "./items.ts";
 import { blockMaterial, itemMaterial, silhouetteMaterial } from "./materials.ts";
 
@@ -17,10 +17,8 @@ const HUD_BOTTOM = 92;
 const SHADE_HEIGHT = 0.09;
 /** the sun sits behind the camera, so shadows fall away from the player */
 const SUN_DIRECTION = new BABYLON.Vector3(0.55, -1, -0.5);
-/** where a standing item throws its shadow on the sand, per unit of height */
+/** where the sun pushes the top of a standing item, per unit of its height */
 const SHADE_DRIFT = new BABYLON.Vector2(SUN_DIRECTION.x / -SUN_DIRECTION.y, SUN_DIRECTION.z / -SUN_DIRECTION.y);
-const SHADE_LENGTH = SHADE_DRIFT.length();
-const SHADE_ANGLE = Math.atan2(SHADE_DRIFT.x, SHADE_DRIFT.y);
 /** floor tiles per noise cell: bigger means broader patches of the same block */
 const PATCH_CELL = 5.5;
 /** board space is x: 0..width, y: 0..height with the player side (high y) closest to the camera */
@@ -68,10 +66,8 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
 
     // no shadow map: each item lays its own sprite down as a flat shadow, cheap and exact
     const shades = itemTiers.map(tier => {
-        const size = tier.radius * 2;
-        const mesh = BABYLON.MeshBuilder.CreateGround(`shade:${tier.name}`, { width: size, height: size * SHADE_LENGTH }, scene);
+        const mesh = buildShadowMesh(tier.texture, tier.radius * 2, SHADE_DRIFT, scene);
         mesh.material = silhouetteMaterial(tier.texture, scene);
-        mesh.rotation.y = SHADE_ANGLE;
         mesh.isVisible = false;
         return mesh;
     });
@@ -86,15 +82,12 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
     const launcher: Tracked = { mesh: null!, shade: null!, stretch: 1 };
     let launcherTier = -1;
 
-    function placeShade(entry: Tracked, x: number, z: number, radius: number, lift: number, pop: number, speed: number, dt: number) {
-        // fast items smear their shadow, a merge pops it, height slides it away from the base
+    function placeShade(entry: Tracked, x: number, z: number, lift: number, pop: number, speed: number, dt: number) {
+        // fast items smear their shadow, a merge pops it, and lifting slides it off the base
         const target = 1 + Math.min(0.3, speed / 1200) + pop * 0.25;
         entry.stretch += (target - entry.stretch) * Math.min(1, dt * 9);
-        const depth = radius * 2 * SHADE_LENGTH * entry.stretch;
-        const reach = depth / 2 + lift * SHADE_LENGTH;
-        const drift = SHADE_DRIFT.clone().normalize();
-        entry.shade.position.set(x + drift.x * reach, SHADE_HEIGHT, z + drift.y * reach);
-        entry.shade.scaling.set(1 + pop * 0.25, 1, entry.stretch);
+        entry.shade.position.set(x + SHADE_DRIFT.x * lift, SHADE_HEIGHT, z + SHADE_DRIFT.y * lift);
+        entry.shade.scaling.set(1 + pop * 0.2, 1, entry.stretch);
     }
 
     const aim = BABYLON.MeshBuilder.CreateGround("aim", { width: 1.6, height: AIM_LENGTH }, scene);
@@ -155,7 +148,7 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
             entry.mesh.position.set(x, radius * scale + 0.6, z);
             entry.mesh.rotation.set(ITEM_LEAN, 0, 0);
             entry.mesh.scaling.setAll(scale);
-            placeShade(entry, x, z, radius, 0, item.pop, speedOf(item), dt);
+            placeShade(entry, x, z, 0, item.pop, speedOf(item), dt);
         }
         for (const [ id, entry ] of instances) {
             if (state.items.some(item => item.id === id)) continue;
@@ -179,7 +172,7 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
         launcher.mesh.rotation.set(ITEM_LEAN, 0, 0);
         launcher.mesh.isVisible = !state.over;
         launcher.shade.isVisible = !state.over;
-        placeShade(launcher, toWorldX(spot.x), toWorldZ(spot.y), radius, hover, 0, 0, dt);
+        placeShade(launcher, toWorldX(spot.x), toWorldZ(spot.y), hover, 0, 0, dt);
 
         // a short guide line straight up the tray, shots never angle away from it
         aim.isVisible = state.drag !== null;

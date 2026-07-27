@@ -31,6 +31,7 @@
     "jsr:@zip-js/zip-js@^2.8.24": "2.8.24",
     "npm:@babylonjs/core@9": "9.0.0",
     "npm:@deno/vite-plugin@^1.0.6": "1.0.6_vite@7.3.1",
+    "npm:@wasm-audio-decoders/ogg-vorbis@~0.1.20": "0.1.20",
     "npm:maxrects-packer@^2.7.3": "2.7.3",
     "npm:vite@*": "7.3.1",
     "npm:vite@^7.3.1": "7.3.1"
@@ -268,6 +269,9 @@
       "os": ["win32"],
       "cpu": ["x64"]
     },
+    "@eshaz/web-worker@1.2.2": {
+      "integrity": "sha512-WxXiHFmD9u/owrzempiDlBB1ZYqiLnm9s6aPc8AlFQalq2tKmqdmMr9GXOupDgzXtqnBipj8Un0gkIm7Sjf8mw=="
+    },
     "@rollup/rollup-android-arm-eabi@4.60.0": {
       "integrity": "sha512-WOhNW9K8bR3kf4zLxbfg6Pxu2ybOUbB2AjMDHSQx86LIF4rH4Ft7vmMwNt0loO0eonglSNy4cpD3MKXXKQu0/A==",
       "os": ["android"],
@@ -396,6 +400,23 @@
     "@types/estree@1.0.8": {
       "integrity": "sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w=="
     },
+    "@wasm-audio-decoders/common@9.0.7": {
+      "integrity": "sha512-WRaUuWSKV7pkttBygml/a6dIEpatq2nnZGFIoPTc5yPLkxL6Wk4YaslPM98OPQvWacvNZ+Py9xROGDtrFBDzag==",
+      "dependencies": [
+        "@eshaz/web-worker",
+        "simple-yenc"
+      ]
+    },
+    "@wasm-audio-decoders/ogg-vorbis@0.1.20": {
+      "integrity": "sha512-zaQPasU5usRjUDXtXOHYED5tfkR4QMXd+EH3Nrz1+4+M5pCsdD+s9YxJqb0oqnTyRu/KUujOmu5Z/m/NT47vwg==",
+      "dependencies": [
+        "@wasm-audio-decoders/common",
+        "codec-parser"
+      ]
+    },
+    "codec-parser@2.5.0": {
+      "integrity": "sha512-Ru9t80fV8B0ZiixQl8xhMTLru+dzuis/KQld32/x5T/+3LwZb0/YvQdSKytX9JqCnRdiupvAvyYJINKrXieziQ=="
+    },
     "esbuild@0.27.4": {
       "integrity": "sha512-Rq4vbHnYkK5fws5NF7MYTU68FPRE1ajX7heQ/8QXXWqNgqqJ/GkmmyxIzUnf2Sr/bakf8l54716CcMGHYhMrrQ==",
       "optionalDependencies": [
@@ -499,6 +520,9 @@
       ],
       "bin": true
     },
+    "simple-yenc@1.0.4": {
+      "integrity": "sha512-5gvxpSd79e9a3V4QDYUqnqxeD4HGlhCakVpb6gMnDD7lexJggSBJRBO5h52y/iJrdXRilX9UCuDaIJhSWm5OWw=="
+    },
     "source-map-js@1.2.1": {
       "integrity": "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA=="
     },
@@ -545,6 +569,7 @@
       "jsr:@zip-js/zip-js@^2.8.24",
       "npm:@babylonjs/core@9",
       "npm:@deno/vite-plugin@^1.0.6",
+      "npm:@wasm-audio-decoders/ogg-vorbis@~0.1.20",
       "npm:maxrects-packer@^2.7.3",
       "npm:vite@^7.3.1"
     ]

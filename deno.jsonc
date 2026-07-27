@@ -18,7 +18,7 @@
         "dev": "deno run -A vite",
         "build": "deno run -A vite build",
         "test": "deno test merge-game/",
-        "lint": "deno lint && deno check merge-game/ block-game/"
+        "lint": "deno lint && deno check merge-game/ block-game/ asset-pipeline/"
     },
     "imports": {
         "@babylonjs/core": "npm:@babylonjs/core@^9.0.0",
@@ -31,6 +31,7 @@
         "@std/fs": "jsr:@std/fs@^1.0.23",
         "@std/http": "jsr:@std/http@^1.0.25",
         "@std/path": "jsr:@std/path@^1.1.4",
+        "@wasm-audio-decoders/ogg-vorbis": "npm:@wasm-audio-decoders/ogg-vorbis@^0.1.20",
         "@zip-js/zip-js": "jsr:@zip-js/zip-js@^2.8.24",
         "maxrects-packer": "npm:maxrects-packer@^2.7.3",
         "vite": "npm:vite@^7.3.1"

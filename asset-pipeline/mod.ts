@@ -7,7 +7,7 @@ import { serveFile } from "@std/http";
 import { dirname } from "@std/path";
 import { ZipReader } from "@zip-js/zip-js";
 import { MaxRectsPacker } from "maxrects-packer";
-import { ensureAssetObject } from "./sounds.ts";
+import { ensureAssetObject, soundIndex, streamSoundFeatures } from "./sounds.ts";
 const kv = await Deno.openKv("./cache/asset-cache.kv");
 const engine = new NullEngine();
 new Scene(engine);
@@ -156,6 +156,16 @@ Deno.serve({ port: Number(Deno.env.get("PORT") ?? 8000) }, async (req) => {
         const path = await ensureAssetObject(objectId, "minecraft/sounds.json");
         if (!path) return respond(new Response("No sound index", { status: 404 }));
         return respond(await serveFile(req, path));
+    }
+    if (url.searchParams.has("soundlist")) {
+        // unlike the rest of the sound endpoints this one needs the jar, the English subtitles are in it
+        await ensureCache(objectId, url);
+        return respond(Response.json(await soundIndex(objectId)));
+    }
+    if (url.searchParams.has("soundfeatures")) {
+        return respond(new Response(await streamSoundFeatures(objectId), {
+            headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store" },
+        }));
     }
     if (url.searchParams.has("sound")) {
         const name = url.searchParams.get("sound")!.replace(/\.ogg$/, "");

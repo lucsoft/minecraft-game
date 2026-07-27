@@ -5,7 +5,8 @@ export const BOARD: Board = { width: 100, height: 176, lineY: 154 };
 /** resting spot of the item waiting to be flicked */
 export const LAUNCHER = { x: 50, y: 165 };
 
-const MAX_ITEMS = 42;
+/** the run ends when the serving zone clogs up, this is only a backstop against runaway trays */
+const MAX_ITEMS = 96;
 const MAX_SPILLED = 3;
 const LAUNCH_COOLDOWN = 0.28;
 /** fast enough that a shot carries all the way to the far rail */
@@ -67,6 +68,8 @@ export interface GameState {
     lastMergeTier: number;
     banner: { text: string; life: number; } | null;
     over: boolean;
+    /** why the run ended, so the dialog can name it */
+    reason: "spill" | "capacity" | null;
     cooldown: number;
     nextId: number;
 }
@@ -88,6 +91,7 @@ export function createGame(): GameState {
         lastMergeTier: 0,
         banner: null,
         over: false,
+        reason: null,
         cooldown: 0,
         nextId: 0,
     };
@@ -213,7 +217,13 @@ export function updateGame(state: GameState, dt: number) {
     state.items = state.items.filter(item => !item.merging);
 
     const spilled = state.items.filter(item => item.settled && item.y > BOARD.lineY).length;
-    if (spilled >= MAX_SPILLED || state.items.length >= MAX_ITEMS) state.over = true;
+    if (spilled >= MAX_SPILLED) {
+        state.over = true;
+        state.reason = "spill";
+    } else if (state.items.length >= MAX_ITEMS) {
+        state.over = true;
+        state.reason = "capacity";
+    }
 }
 
 function merge(state: GameState, a: Item, b: Item) {

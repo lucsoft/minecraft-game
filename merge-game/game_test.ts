@@ -205,13 +205,38 @@ Deno.test("items left in the serving zone end the run", () => {
     for (const x of [ 20, 50, 80 ]) place(state, 0, x, BOARD.height - 20).settled = true;
     run(state, 0.2);
     assert(state.over);
+    assertEquals(state.reason, "spill");
 });
 
-Deno.test("a single spill is survivable", () => {
+Deno.test("a crowded tray is fine as long as the serving zone stays clear", () => {
     const state = createGame();
-    place(state, 0, 20, BOARD.height - 20).settled = true;
+    // fill the field above the line with more items than the old cap allowed
+    for (let row = 0; row < 6; row++) {
+        for (let column = 0; column < 9; column++) {
+            place(state, 0, 10 + column * 10, 20 + row * 12).settled = true;
+        }
+    }
+    assertGreater(state.items.length, 50);
     run(state, 0.5);
     assertFalse(state.over);
+});
+
+Deno.test("two items may rest in the serving zone, a third ends the run", () => {
+    const state = createGame();
+    place(state, 0, 20, BOARD.height - 20).settled = true;
+    place(state, 0, 50, BOARD.height - 20).settled = true;
+    run(state, 0.5);
+    assertFalse(state.over);
+
+    // the item being shot flies through the zone without counting, it is not at rest yet
+    slide(state, 80);
+    run(state, 0.2);
+    assertFalse(state.over);
+
+    place(state, 0, 80, BOARD.height - 20).settled = true;
+    run(state, 0.2);
+    assert(state.over);
+    assertEquals(state.reason, "spill");
 });
 
 Deno.test("the game ignores input once it is over", () => {

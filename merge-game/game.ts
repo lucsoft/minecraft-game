@@ -1,0 +1,250 @@
+import { itemTiers, MAX_TIER } from "./items.ts";
+import { Board, Item, radiusOf, stepPhysics } from "./physics.ts";
+
+export const BOARD: Board = { width: 100, height: 176, lineY: 132 };
+/** resting spot of the item waiting to be flicked */
+export const LAUNCHER = { x: 50, y: 158 };
+
+const MAX_ITEMS = 42;
+const MAX_SPILLED = 3;
+const LAUNCH_COOLDOWN = 0.28;
+const LAUNCH_SPEED = 315;
+const ORDER_COUNT = 3;
+/** what drops into the launcher: mostly coal, some redstone, copper is a treat */
+const SPAWN_WEIGHTS: [ tier: number, chance: number ][] = [ [ 0, 0.5 ], [ 1, 0.4 ], [ 2, 0.1 ] ];
+const MAX_SPAWN_TIER = 2;
+
+export interface Order {
+    tier: number;
+    reward: number;
+    done: boolean;
+}
+
+export interface FloatingText {
+    x: number;
+    y: number;
+    text: string;
+    color: string;
+    life: number;
+}
+
+/** a delivered item flying from the tray up to its order card */
+export interface Flight {
+    tier: number;
+    x: number;
+    y: number;
+    order: number;
+    life: number;
+}
+
+export const FLIGHT_TIME = 0.6;
+
+/** the item held under the finger, sliding along the launch line */
+export interface Drag {
+    x: number;
+    y: number;
+}
+
+export interface GameState {
+    items: Item[];
+    /** upcoming tiers, index 0 sits in the launcher */
+    queue: number[];
+    orders: Order[];
+    coins: number;
+    round: number;
+    deliveries: number;
+    highestTier: number;
+    texts: FloatingText[];
+    flights: Flight[];
+    drag: Drag | null;
+    /** number of shots taken, used to hide the swipe hint */
+    shots: number;
+    banner: { text: string; life: number; } | null;
+    over: boolean;
+    cooldown: number;
+    nextId: number;
+}
+
+export function createGame(): GameState {
+    const state: GameState = {
+        items: [],
+        queue: [],
+        orders: [],
+        coins: 0,
+        round: 1,
+        deliveries: 0,
+        highestTier: 0,
+        texts: [],
+        flights: [],
+        drag: null,
+        shots: 0,
+        banner: null,
+        over: false,
+        cooldown: 0,
+        nextId: 0,
+    };
+    while (state.queue.length < 3) state.queue.push(pickSpawnTier());
+    fillOrders(state);
+    return state;
+}
+
+export function resetGame(state: GameState) {
+    Object.assign(state, createGame());
+}
+
+export function pickSpawnTier() {
+    let roll = Math.random();
+    for (const [ tier, chance ] of SPAWN_WEIGHTS) {
+        roll -= chance;
+        if (roll < 0) return tier;
+    }
+    return 0;
+}
+
+/** orders always ask for something above the spawn tiers, so they have to be merged */
+function createOrder(state: GameState): Order {
+    const base = MAX_SPAWN_TIER + 1 + Math.floor((state.round - 1) / 3);
+    for (let attempt = 0; attempt < 6; attempt++) {
+        const tier = Math.min(MAX_TIER, base + Math.floor(Math.random() * 2));
+        if (state.orders.some(order => !order.done && order.tier === tier)) continue;
+        return { tier, reward: itemTiers[ tier ].coins * 3, done: false };
+    }
+    const tier = Math.min(MAX_TIER, base);
+    return { tier, reward: itemTiers[ tier ].coins * 3, done: false };
+}
+
+function fillOrders(state: GameState) {
+    state.orders = [];
+    while (state.orders.length < ORDER_COUNT) state.orders.push(createOrder(state));
+}
+
+/** shots only wait for a short reload, items already sliding do not block the next one */
+export function isReady(state: GameState) {
+    if (state.over || state.cooldown > 0) return false;
+    return state.items.length < MAX_ITEMS;
+}
+
+/** where the next item currently sits: under the finger while sliding, on its spot otherwise */
+export function launcherPosition(state: GameState) {
+    return state.drag ?? LAUNCHER;
+}
+
+/** the held item only slides sideways, it never leaves the launch line */
+function clampToLane(state: GameState, x: number) {
+    const radius = radiusOf(state.queue[ 0 ]);
+    return Math.min(BOARD.width - radius, Math.max(radius, x));
+}
+
+export function beginDrag(state: GameState, point: { x: number; y: number; }) {
+    if (!isReady(state)) return;
+    state.drag = { x: clampToLane(state, point.x), y: LAUNCHER.y };
+}
+
+export function moveDrag(state: GameState, point: { x: number; y: number; }) {
+    if (!state.drag) return;
+    state.drag.x = clampToLane(state, point.x);
+}
+
+/** letting go shoots straight up the tray, from wherever the item was slid to */
+export function releaseDrag(state: GameState) {
+    const drag = state.drag;
+    state.drag = null;
+    if (drag) launch(state, drag);
+}
+
+export function launch(state: GameState, from: Drag) {
+    if (!isReady(state)) return;
+    const tier = state.queue.shift()!;
+    state.queue.push(pickSpawnTier());
+    state.items.push({
+        id: state.nextId++,
+        tier,
+        x: from.x,
+        y: from.y,
+        vx: 0,
+        vy: -LAUNCH_SPEED,
+        angle: 0,
+        spin: 0,
+        pop: 0,
+        settled: false,
+        merging: false,
+    });
+    state.shots++;
+    state.cooldown = LAUNCH_COOLDOWN;
+}
+
+export function updateGame(state: GameState, dt: number) {
+    for (const text of state.texts) text.life -= dt;
+    state.texts = state.texts.filter(text => text.life > 0);
+    for (const flight of state.flights) flight.life -= dt;
+    state.flights = state.flights.filter(flight => flight.life > 0);
+    if (state.banner) {
+        state.banner.life -= dt;
+        if (state.banner.life <= 0) state.banner = null;
+    }
+
+    if (state.over) return;
+    state.cooldown = Math.max(0, state.cooldown - dt);
+
+    for (const [ a, b ] of stepPhysics(state.items, BOARD, dt)) {
+        merge(state, a, b);
+    }
+
+    for (const item of state.items) {
+        if (item.tier === MAX_TIER && item.settled && !item.merging) {
+            item.merging = true;
+            award(state, item, itemTiers[ MAX_TIER ].coins * 2, "#ffe97f");
+        }
+    }
+    state.items = state.items.filter(item => !item.merging);
+
+    const spilled = state.items.filter(item => item.settled && item.y > BOARD.lineY).length;
+    if (spilled >= MAX_SPILLED || state.items.length >= MAX_ITEMS) state.over = true;
+}
+
+function merge(state: GameState, a: Item, b: Item) {
+    const tier = a.tier + 1;
+    const radius = radiusOf(tier);
+    const merged: Item = {
+        id: state.nextId++,
+        tier,
+        x: Math.min(BOARD.width - radius, Math.max(radius, (a.x + b.x) / 2)),
+        y: Math.min(BOARD.height - radius, Math.max(radius, (a.y + b.y) / 2)),
+        vx: (a.vx + b.vx) * 0.35,
+        vy: (a.vy + b.vy) * 0.35,
+        angle: 0,
+        spin: (a.spin + b.spin) * 0.5,
+        pop: 1,
+        settled: false,
+        merging: false,
+    };
+
+    state.highestTier = Math.max(state.highestTier, tier);
+    state.coins += itemTiers[ tier ].coins;
+    state.texts.push({ x: merged.x, y: merged.y, text: `+${itemTiers[ tier ].coins}`, color: "#ffffff", life: 0.9 });
+
+    const index = state.orders.findIndex(order => !order.done && order.tier === tier);
+    if (index !== -1) {
+        const order = state.orders[ index ];
+        order.done = true;
+        state.deliveries++;
+        state.flights.push({ tier, x: merged.x, y: merged.y, order: index, life: FLIGHT_TIME });
+        award(state, merged, order.reward, "#8bf58b");
+        if (state.orders.every(entry => entry.done)) completeRound(state);
+        return;
+    }
+    state.items.push(merged);
+}
+
+function completeRound(state: GameState) {
+    const bonus = 500 * state.round;
+    state.coins += bonus;
+    state.banner = { text: `ROUND ${state.round} COMPLETE   +${bonus}`, life: 3 };
+    state.round++;
+    fillOrders(state);
+}
+
+function award(state: GameState, item: Item, coins: number, color: string) {
+    state.coins += coins;
+    state.texts.push({ x: item.x, y: item.y, text: `+${coins}`, color, life: 1.4 });
+}

@@ -2,12 +2,12 @@ import { soundFileUrl } from "../asset-pipeline-url.ts";
 
 /**
  * Minecraft's own sounds, pulled through the asset pipeline. Everything is kept quiet and
- * short so a long session stays pleasant: a fishing-rod style whoosh for a shot, an
- * experience orb that climbs with the tier for a merge, and the level up jingle for an order.
+ * short so a long session stays pleasant: a light pop for a shot, an experience orb that
+ * climbs with the tier for a merge, and a little bell chord when an order is served.
  */
 const MASTER = 0.5;
 
-const THROW = "entity/bobber/castfast";
+const THROW = "random/pop";
 const MERGE = "random/orb";
 const DELIVER = "note/bell";
 const DELIVER_CHORD = [ 1, 1.26, 1.5 ];
@@ -51,7 +51,7 @@ function play(name: string, gain: number, rate = 1, delay = 0) {
 
 export function playShoot() {
     // slight pitch drift so repeated shots do not grate
-    play(THROW, 0.7, 0.92 + Math.random() * 0.16);
+    play(THROW, 0.55, 0.95 + Math.random() * 0.2);
 }
 
 export function playMerge(tier: number) {

@@ -189,7 +189,7 @@ function respond(rsp: Response) {
     return rsp;
 }
 
-Deno.serve(async (req) => {
+Deno.serve({ port: Number(Deno.env.get("PORT") ?? 8000) }, async (req) => {
     if (req.method === "OPTIONS")
         return respond(new Response("", { status: 200 }));
     console.log(`[INFO] ${req.method} - ${req.url}`);

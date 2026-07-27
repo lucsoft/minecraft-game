@@ -3,7 +3,7 @@ import { textureFileUrl } from "../asset-pipeline-url.ts";
 
 const ALPHA_THRESHOLD = 8;
 /** how many texels deep an item is, vanilla dropped items are one */
-const THICKNESS_TEXELS = 3;
+const THICKNESS_TEXELS = 2;
 
 export interface AlphaMask {
     width: number;
@@ -101,21 +101,24 @@ export function buildItemMesh(name: string, size: number, mask: AlphaMask, scene
 }
 
 /**
- * Flat shadow for a standing sprite: the quad is sheared along `drift` (where the sun pushes
- * the top of the item) so the silhouette keeps the same orientation as the item itself.
- * The mesh starts at the item's base, so placing it needs no offset.
+ * Flat shadow of a sprite standing at `lean` radians: every corner is projected onto the sand
+ * along `drift`, which shears the quad instead of turning it, so the silhouette keeps the
+ * orientation of the item. Coordinates are relative to the item's footprint, including the
+ * way the lean tips its bottom edge towards the camera.
  */
-export function buildShadowMesh(name: string, size: number, drift: BABYLON.Vector2, scene: BABYLON.Scene) {
+export function buildShadowMesh(name: string, size: number, lean: number, drift: BABYLON.Vector2, scene: BABYLON.Scene) {
     const half = size / 2;
-    const reachX = drift.x * size;
-    const reachZ = drift.y * size;
+    const height = size * Math.cos(lean);
+    const nearZ = -half * Math.sin(lean);
+    const reachX = drift.x * height;
+    const reachZ = half * Math.sin(lean) + drift.y * height - nearZ;
     const mesh = new BABYLON.Mesh(`shade:${name}`, scene);
     const vertexData = new BABYLON.VertexData();
     vertexData.positions = [
-        -half, 0, 0,
-        half, 0, 0,
-        half + reachX, 0, reachZ,
-        -half + reachX, 0, reachZ,
+        -half, 0, nearZ,
+        half, 0, nearZ,
+        half + reachX, 0, nearZ + reachZ,
+        -half + reachX, 0, nearZ + reachZ,
     ];
     vertexData.normals = [ 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0 ];
     // u mirrored like the item faces, v running from the base of the sprite to its top

@@ -57,9 +57,9 @@ Deno.test("the launcher gets mostly coal, some redstone and rarely copper", () =
     const rolls = 20_000;
     const counts = [ 0, 0, 0 ];
     for (let roll = 0; roll < rolls; roll++) counts[ pickSpawnTier() ]++;
-    assertAlmostEquals(counts[ 0 ] / rolls, 0.5, 0.03);
-    assertAlmostEquals(counts[ 1 ] / rolls, 0.4, 0.03);
-    assertAlmostEquals(counts[ 2 ] / rolls, 0.1, 0.03);
+    assertAlmostEquals(counts[ 0 ] / rolls, 0.65, 0.03);
+    assertAlmostEquals(counts[ 1 ] / rolls, 0.3, 0.03);
+    assertAlmostEquals(counts[ 2 ] / rolls, 0.05, 0.02);
 });
 
 Deno.test("objective rewards match the item value table", () => {

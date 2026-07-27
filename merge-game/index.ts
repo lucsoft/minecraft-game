@@ -12,7 +12,8 @@ const hud = createHud();
 const state = createGame();
 
 hud.onRestart(() => resetGame(state));
-globalThis.addEventListener("resize", () => stage.resize());
+// the canvas can change size without a window resize event, e.g. a phone hiding its address bar
+new ResizeObserver(() => stage.resize()).observe(canvas);
 
 canvas.addEventListener("pointerdown", (event) => {
     if (!event.isPrimary || event.button !== 0) return;

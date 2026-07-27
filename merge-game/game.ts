@@ -1,9 +1,9 @@
 import { itemTiers, MAX_TIER } from "./items.ts";
 import { Board, Item, radiusOf, stepPhysics } from "./physics.ts";
 
-export const BOARD: Board = { width: 100, height: 176, lineY: 132 };
+export const BOARD: Board = { width: 100, height: 176, lineY: 154 };
 /** resting spot of the item waiting to be flicked */
-export const LAUNCHER = { x: 50, y: 158 };
+export const LAUNCHER = { x: 50, y: 165 };
 
 const MAX_ITEMS = 42;
 const MAX_SPILLED = 3;
@@ -11,7 +11,7 @@ const LAUNCH_COOLDOWN = 0.28;
 const LAUNCH_SPEED = 315;
 const ORDER_COUNT = 3;
 /** what drops into the launcher: mostly coal, some redstone, copper is a treat */
-const SPAWN_WEIGHTS: [ tier: number, chance: number ][] = [ [ 0, 0.5 ], [ 1, 0.4 ], [ 2, 0.1 ] ];
+const SPAWN_WEIGHTS: [ tier: number, chance: number ][] = [ [ 0, 0.65 ], [ 1, 0.3 ], [ 2, 0.05 ] ];
 const MAX_SPAWN_TIER = 2;
 
 export interface Order {

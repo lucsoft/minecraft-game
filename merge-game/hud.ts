@@ -135,10 +135,11 @@ const style = `
 .hud .hint {
     position: absolute;
     left: 50%;
-    bottom: 84px;
+    bottom: 78px;
     transform: translateX(-50%);
-    font-size: 13px;
-    letter-spacing: 2px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    white-space: nowrap;
     animation: hudPulse 1.4s ease-in-out infinite;
 }
 

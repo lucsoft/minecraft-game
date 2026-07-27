@@ -11,7 +11,12 @@ const RAIL_DROP = 9;
 const CAMERA_PITCH = 1.02;
 const ITEM_LEAN = -0.55;
 const AIM_LENGTH = 34;
+/** screen space kept clear of the tray so the hud never covers it, in css pixels */
+const HUD_TOP = 96;
+const HUD_BOTTOM = 92;
 const SHADE_HEIGHT = 0.09;
+/** floor tiles per noise cell: bigger means broader patches of the same block */
+const PATCH_CELL = 5.5;
 /** board space is x: 0..width, y: 0..height with the player side (high y) closest to the camera */
 const toWorldX = (x: number) => x - BOARD.width / 2;
 const toWorldZ = (y: number) => y - BOARD.height / 2;
@@ -90,8 +95,18 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
         const width = (BOARD.width + RAIL_WIDTH * 2) / 2;
         // the tray depth is foreshortened by the camera tilt
         const depth = ((BOARD.height + RAIL_WIDTH * 2) / 2) * Math.sin(CAMERA_PITCH);
-        const distance = Math.max(width / Math.tan(halfHorizontal), depth / Math.tan(halfVertical)) * 1.04;
-        const target = new BABYLON.Vector3(0, 0, -6);
+
+        // leave room for the hud bars, then centre the tray in what is left
+        const screenHeight = canvas.clientHeight || 1;
+        const top = Math.min(0.24, HUD_TOP / screenHeight);
+        const bottom = Math.min(0.28, HUD_BOTTOM / screenHeight);
+        const usable = Math.max(0.35, 1 - top - bottom);
+        const distance = Math.max(
+            width / Math.tan(halfHorizontal),
+            depth / (Math.tan(halfVertical) * usable),
+        ) * 1.02;
+        const visibleDepth = (2 * distance * Math.tan(halfVertical)) / Math.sin(CAMERA_PITCH);
+        const target = new BABYLON.Vector3(0, 0, (visibleDepth * (bottom - top)) / 2);
         camera.position = target.add(new BABYLON.Vector3(0, Math.sin(CAMERA_PITCH), Math.cos(CAMERA_PITCH)).scale(distance));
         camera.setTarget(target);
     }
@@ -230,7 +245,7 @@ function trayShadeOverlay(scene: BABYLON.Scene) {
 
 /** the tray itself drops a shadow onto the stone floor around it */
 function traySurroundShadow(scene: BABYLON.Scene) {
-    const margin = 34;
+    const margin = 74;
     const width = BOARD.width + RAIL_WIDTH * 2 + margin * 2;
     const depth = BOARD.height + RAIL_WIDTH * 2 + margin * 2;
     const scale = 2;
@@ -243,14 +258,19 @@ function traySurroundShadow(scene: BABYLON.Scene) {
     const inset = margin * scale;
     const boxWidth = canvasWidth - inset * 2;
     const boxHeight = canvasHeight - inset * 2;
-    context.save();
-    context.shadowColor = "rgba(0,0,0,0.62)";
-    context.shadowBlur = 15 * scale;
-    context.shadowOffsetX = -3 * scale;
-    context.shadowOffsetY = 5 * scale;
-    context.fillStyle = "#000000";
-    context.fillRect(inset, inset, boxWidth, boxHeight);
-    context.restore();
+    // two passes: a broad soft falloff plus a tight dark band right against the frame,
+    // biased a little towards the camera the way the sun throws it
+    const passes: [ blur: number, alpha: number ][] = [ [ 36, 0.55 ], [ 14, 0.8 ], [ 5, 0.85 ] ];
+    for (const [ blur, alpha ] of passes) {
+        context.save();
+        context.shadowColor = `rgba(0,0,0,${alpha})`;
+        context.shadowBlur = blur * scale;
+        context.shadowOffsetX = -2 * scale;
+        context.shadowOffsetY = 4 * scale;
+        context.fillStyle = "#000000";
+        context.fillRect(inset, inset, boxWidth, boxHeight);
+        context.restore();
+    }
     // the tray covers its own footprint, only the surrounding shadow should show
     context.clearRect(inset, inset, boxWidth, boxHeight);
     texture.update();
@@ -300,6 +320,24 @@ function tileNoise(col: number, row: number, seed: number) {
     return ((hash ^ (hash >>> 16)) >>> 0) / 4294967296;
 }
 
+/** value noise: hashed lattice blended with a smoothstep, the cheap cousin of perlin noise */
+function smoothNoise(x: number, y: number, seed: number) {
+    const col = Math.floor(x);
+    const row = Math.floor(y);
+    const fade = (t: number) => t * t * (3 - 2 * t);
+    const fx = fade(x - col);
+    const fy = fade(y - row);
+    const top = tileNoise(col, row, seed) * (1 - fx) + tileNoise(col + 1, row, seed) * fx;
+    const bottom = tileNoise(col, row + 1, seed) * (1 - fx) + tileNoise(col + 1, row + 1, seed) * fx;
+    return top * (1 - fy) + bottom * fy;
+}
+
+/** two octaves of value noise, stretched so the whole palette gets used */
+function patchNoise(x: number, y: number, seed: number) {
+    const value = smoothNoise(x, y, seed) * 0.68 + smoothNoise(x * 2.4, y * 2.4, seed + 8191) * 0.32;
+    return Math.min(1, Math.max(0, (value - 0.5) * 2.1 + 0.5));
+}
+
 /**
  * Flat floor built one block at a time, each tile getting a rotated and sometimes mirrored
  * copy of the texture. Minecraft varies flat ground the same way so it does not read as tiling.
@@ -319,7 +357,9 @@ function scatteredFloor(name: string, textures: string[], scene: BABYLON.Scene, 
             const z0 = -depth / 2 + row * tileDepth;
             const x1 = x0 + tileWidth;
             const z1 = z0 + tileDepth;
-            const pick = Math.floor(tileNoise(col, row, seed + 5501) * textures.length);
+            // one smooth noise field walks along the palette, so tones drift instead of jumping
+            const patch = patchNoise(col / PATCH_CELL, row / PATCH_CELL, seed + 5501);
+            const pick = Math.min(textures.length - 1, Math.floor(patch * textures.length));
             const varies = randomlyRotated.has(textures[ pick ]);
             const turns = varies ? Math.floor(tileNoise(col, row, seed) * 4) : 0;
             const mirror = varies && tileNoise(col, row, seed + 977) > 0.5;

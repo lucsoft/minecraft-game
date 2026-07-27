@@ -33,25 +33,38 @@ export const boardTextures = {
 };
 
 /**
- * The floor around the tray: mostly one polished stone with a few accent blocks mixed in,
- * the way a builder would lay a calm modern patio.
+ * The floor around the tray. Listed light to dark: a noise field walks through the palette,
+ * so neighbouring tiles stay close in tone and the floor reads as soft patches.
  */
 export const backgroundPalette = [
-    "block/polished_andesite",
-    "block/polished_andesite",
-    "block/polished_andesite",
-    "block/polished_andesite",
-    "block/polished_andesite",
-    "block/polished_andesite",
-    "block/smooth_stone",
     "block/andesite",
+    "block/polished_andesite",
+    "block/cobblestone",
+    "block/stone",
+    "block/chiseled_stone_bricks",
+    "block/furnace_top",
+    "block/coal_ore",
+    "block/observer_top",
+    "block/polished_basalt_top",
+    "block/gray_glazed_terracotta",
+    "block/bedrock",
+    "block/deepslate_top",
+    "block/basalt_top",
+    "block/deepslate_coal_ore",
 ];
 
 /**
- * Vanilla only rotates and mirrors the model of a few natural blocks (sand, stone, dirt…).
+ * Vanilla only rotates and mirrors the model of a few blocks (sand, stone, bedrock, deepslate…).
  * Polished or patterned blocks always face the same way, so they must not be turned around.
  */
-export const randomlyRotated = new Set([ "block/sand", "block/stone", "block/gravel", "block/dirt" ]);
+export const randomlyRotated = new Set([
+    "block/sand",
+    "block/stone",
+    "block/gravel",
+    "block/dirt",
+    "block/bedrock",
+    "block/deepslate_top",
+]);
 
 export function allTextureNames() {
     return [ ...itemTiers.map(tier => tier.texture), ...Object.values(boardTextures), ...backgroundPalette ];

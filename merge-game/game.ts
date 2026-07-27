@@ -7,6 +7,10 @@ export const LAUNCHER = { x: 50, y: 165 };
 
 /** the one way to lose: this many items coming to rest in the serving zone */
 export const MAX_SPILLED = 3;
+/** every shot thumps the sand around the launch line, shoving spilled items back up the tray */
+const BLAST_RADIUS = 34;
+const BLAST_SPEED = 170;
+export const BLAST_TIME = 0.3;
 const LAUNCH_COOLDOWN = 0.28;
 /** fast enough that a shot carries all the way to the far rail */
 const LAUNCH_SPEED = 350;
@@ -68,6 +72,8 @@ export interface GameState {
     banner: { text: string; life: number; } | null;
     /** items at rest in the serving zone, drives the warning colours */
     spilled: number;
+    /** the thump of the last shot, for the ring effect */
+    blast: { x: number; y: number; life: number; } | null;
     over: boolean;
     cooldown: number;
     nextId: number;
@@ -90,6 +96,7 @@ export function createGame(): GameState {
         lastMergeTier: 0,
         banner: null,
         spilled: 0,
+        blast: null,
         over: false,
         cooldown: 0,
         nextId: 0,
@@ -168,8 +175,28 @@ export function releaseDrag(state: GameState) {
     if (drag) launch(state, drag);
 }
 
+/** the shot lands with a thump that pushes nearby items away, always up the tray */
+function blast(state: GameState, from: Drag) {
+    state.blast = { x: from.x, y: from.y, life: BLAST_TIME };
+    for (const item of state.items) {
+        const dx = item.x - from.x;
+        const dy = item.y - from.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance > BLAST_RADIUS) continue;
+        const falloff = 1 - distance / BLAST_RADIUS;
+        const nx = distance < 0.001 ? 0 : dx / distance;
+        // never shove an item towards the near rail, the point is to clear the zone
+        const ny = Math.min(distance < 0.001 ? -1 : dy / distance, -0.4);
+        const weight = (itemTiers[ 0 ].radius / itemTiers[ item.tier ].radius) ** 0.8;
+        item.vx += nx * BLAST_SPEED * falloff * weight * 0.7;
+        item.vy += ny * BLAST_SPEED * falloff * weight;
+        item.settled = false;
+    }
+}
+
 export function launch(state: GameState, from: Drag) {
     if (!isReady(state)) return;
+    blast(state, from);
     const tier = state.queue.shift()!;
     state.queue.push(pickSpawnTier());
     state.items.push({
@@ -194,6 +221,10 @@ export function updateGame(state: GameState, dt: number) {
     state.texts = state.texts.filter(text => text.life > 0);
     for (const flight of state.flights) flight.life -= dt;
     state.flights = state.flights.filter(flight => flight.life > 0);
+    if (state.blast) {
+        state.blast.life -= dt;
+        if (state.blast.life <= 0) state.blast = null;
+    }
     if (state.banner) {
         state.banner.life -= dt;
         if (state.banner.life <= 0) state.banner = null;

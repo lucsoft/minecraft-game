@@ -286,3 +286,31 @@ Deno.test("the spill count is published for the warning colours", () => {
     assertEquals(state.spilled, 2);
     assertFalse(state.over);
 });
+
+Deno.test("a shot thumps spilled items back up the tray", () => {
+    const state = createGame();
+    const spilled = place(state, 0, 52, BOARD.height - 16);
+    spilled.settled = true;
+    const distant = place(state, 0, 20, 40);
+    distant.settled = true;
+
+    slide(state, 50);
+    // the nearby item is shoved forward and wakes up, the far one is untouched
+    assertLess(spilled.vy, 0);
+    assertFalse(spilled.settled);
+    assertEquals(distant.vy, 0);
+    assert(distant.settled);
+
+    const before = spilled.y;
+    run(state, 1);
+    assertLess(spilled.y, before);
+});
+
+Deno.test("the thump never pushes an item towards the near rail", () => {
+    const state = createGame();
+    // sitting between the launch line and the rail, the only way out is forwards
+    const behind = place(state, 0, 50, BOARD.height - 6);
+    behind.settled = true;
+    slide(state, 50);
+    assertLess(behind.vy, 0);
+});

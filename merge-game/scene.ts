@@ -1,5 +1,5 @@
 import * as BABYLON from "@babylonjs/core";
-import { BOARD, GameState, launcherPosition, MAX_SPILLED } from "./game.ts";
+import { BLAST_TIME, BOARD, GameState, launcherPosition, MAX_SPILLED } from "./game.ts";
 import { speedOf } from "./physics.ts";
 import { buildItemMesh, buildShadowMesh, buildShadowTexture, loadAlphaMask } from "./item-mesh.ts";
 import { backgroundPalette, boardTextures, itemTiers, randomlyRotated } from "./items.ts";
@@ -92,6 +92,27 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
         entry.shade.scaling.set(1 + pop * 0.2, 1, entry.stretch);
     }
 
+    // expanding ring for the thump of a shot
+    const ring = BABYLON.MeshBuilder.CreateGround("blast", { width: 2, height: 2 }, scene);
+    const ringMaterial = new BABYLON.StandardMaterial("blast", scene);
+    const ringTexture = new BABYLON.DynamicTexture("blast", { width: 128, height: 128 }, scene, true);
+    const ringContext = ringTexture.getContext() as unknown as CanvasRenderingContext2D;
+    const ringGradient = ringContext.createRadialGradient(64, 64, 20, 64, 64, 64);
+    ringGradient.addColorStop(0, "rgba(255,255,255,0)");
+    ringGradient.addColorStop(0.62, "rgba(255,255,255,0.85)");
+    ringGradient.addColorStop(1, "rgba(255,255,255,0)");
+    ringContext.fillStyle = ringGradient;
+    ringContext.fillRect(0, 0, 128, 128);
+    ringTexture.update(true);
+    ringTexture.hasAlpha = true;
+    ringMaterial.opacityTexture = ringTexture;
+    ringMaterial.diffuseColor = new BABYLON.Color3(1, 0.96, 0.86);
+    ringMaterial.emissiveColor = new BABYLON.Color3(0.7, 0.66, 0.56);
+    ringMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+    ringMaterial.disableLighting = true;
+    ring.material = ringMaterial;
+    ring.isVisible = false;
+
     const aim = BABYLON.MeshBuilder.CreateGround("aim", { width: 1.6, height: AIM_LENGTH }, scene);
     const aimMaterial = new BABYLON.StandardMaterial("aim", scene);
     aimMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
@@ -175,6 +196,16 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
         launcher.mesh.isVisible = !state.over;
         launcher.shade.isVisible = !state.over;
         placeShade(launcher, toWorldX(spot.x), toWorldZ(spot.y), hover, 0, 0, dt);
+
+        // the thump spreads out and fades where the shot was let go
+        ring.isVisible = state.blast !== null;
+        if (state.blast) {
+            const grown = Math.min(1, Math.max(0, 1 - state.blast.life / BLAST_TIME));
+            const size = 14 + grown * 52;
+            ring.position.set(toWorldX(state.blast.x), 0.16, toWorldZ(state.blast.y));
+            ring.scaling.set(size / 2, 1, size / 2);
+            ringMaterial.alpha = 0.5 * (1 - grown) ** 1.5;
+        }
 
         // the serving zone warns before it is lost: a red wash for the first item, a pulse for the last
         const danger = Math.min(state.spilled, MAX_SPILLED - 1);

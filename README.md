@@ -11,7 +11,21 @@ The pipeline fetches and caches ZIP archives, collects mcmeta files within them,
 - `atlaspng` — returns the precomputed texture atlas as a PNG
 - `atlas` — returns the atlas with UV rect metadata as a CBOR file
 - `file` — returns a specific file from the archive by path
+- `sounds` — returns the version's raw `sounds.json`
+- `soundlist` — returns every sound file of the version plus the events that play it
+- `sound` — returns one sound as ogg, e.g. `sound=random/pop`
+- `soundfeatures` — streams one newline delimited analysis row per sound
 - _(none)_ — returns JSON with blockstates and models
+
+Sounds live in the version's asset objects rather than the jar, so the pipeline resolves them
+through the asset index and caches each file on first use.
+
+## Sound analysis
+
+`soundfeatures` decodes each ogg and reduces it to MFCCs plus the usual spectral and envelope
+descriptors, which is what the graph on `/sound` measures similarity with. The first run has to
+fetch and decode roughly 4200 files, so rows are streamed as they are finished and appended to
+`cache/<objectId>/sound-features.jsonl`; every run after that replays that file instantly.
 
 **Example** (texture atlas PNG for 1.21.4):
 

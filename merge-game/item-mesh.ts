@@ -2,6 +2,8 @@ import * as BABYLON from "@babylonjs/core";
 import { textureFileUrl } from "../asset-pipeline-url.ts";
 
 const ALPHA_THRESHOLD = 8;
+/** how many texels deep an item is, vanilla dropped items are one */
+const THICKNESS_TEXELS = 3;
 
 export interface AlphaMask {
     width: number;
@@ -32,7 +34,7 @@ export async function loadAlphaMask(name: string): Promise<AlphaMask> {
  */
 export function buildItemMesh(name: string, size: number, mask: AlphaMask, scene: BABYLON.Scene) {
     const { width, height, alpha } = mask;
-    const depth = size / Math.max(width, height);
+    const depth = (size / Math.max(width, height)) * THICKNESS_TEXELS;
     const half = size / 2;
     const texelX = size / width;
     const texelY = size / height;
@@ -54,9 +56,10 @@ export function buildItemMesh(name: string, size: number, mask: AlphaMask, scene
         indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
     }
 
-    // wide faces, the alpha channel cuts out the silhouette
+    // wide faces, the alpha channel cuts out the silhouette. world +x points to screen left,
+    // so u runs the other way round to keep sprites reading like their gui icon
     const faceUV = (corners: [ number, number, number ][]) =>
-        corners.map(([ x, y ]) => [ (x + half) / size, (y + half) / size ] as [ number, number ]);
+        corners.map(([ x, y ]) => [ 1 - (x + half) / size, (y + half) / size ] as [ number, number ]);
     const front: [ number, number, number ][] = [ [ -half, -half, depth / 2 ], [ half, -half, depth / 2 ], [ half, half, depth / 2 ], [ -half, half, depth / 2 ] ];
     const back: [ number, number, number ][] = [ [ half, -half, -depth / 2 ], [ -half, -half, -depth / 2 ], [ -half, half, -depth / 2 ], [ half, half, -depth / 2 ] ];
     quad(front, [ 0, 0, 1 ], faceUV(front));
@@ -69,7 +72,7 @@ export function buildItemMesh(name: string, size: number, mask: AlphaMask, scene
             const right = left + texelX;
             const top = half - row * texelY;
             const bottom = top - texelY;
-            const texel: [ number, number ] = [ (col + 0.5) / width, 1 - (row + 0.5) / height ];
+            const texel: [ number, number ] = [ 1 - (col + 0.5) / width, 1 - (row + 0.5) / height ];
             const flat = [ texel, texel, texel, texel ];
 
             if (!opaque(col - 1, row)) {

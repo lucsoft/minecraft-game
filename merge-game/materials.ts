@@ -17,6 +17,24 @@ export function blockMaterial(name: string, scene: BABYLON.Scene, uTiles: number
     return material;
 }
 
+/** the item sprite as a flat black shape, used as its shadow on the sand */
+export function silhouetteMaterial(name: string, scene: BABYLON.Scene) {
+    const material = new BABYLON.StandardMaterial(`shade:${name}`, scene);
+    const texture = pixelTexture(name, scene);
+    texture.hasAlpha = true;
+    // mirrored to match the item, whose sprite also runs against world x
+    texture.uScale = -1;
+    texture.uOffset = 1;
+    material.opacityTexture = texture;
+    material.diffuseColor = new BABYLON.Color3(0, 0, 0);
+    material.specularColor = new BABYLON.Color3(0, 0, 0);
+    material.emissiveColor = new BABYLON.Color3(0, 0, 0);
+    material.disableLighting = true;
+    material.alpha = 0.45;
+    material.backFaceCulling = false;
+    return material;
+}
+
 /** dropped-item look: the sprite on both wide faces, a flat colour on the edges */
 export function itemMaterial(name: string, scene: BABYLON.Scene) {
     const material = new BABYLON.StandardMaterial(`item:${name}`, scene);

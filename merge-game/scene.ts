@@ -1,9 +1,9 @@
 import * as BABYLON from "@babylonjs/core";
 import { BOARD, GameState, launcherPosition } from "./game.ts";
+import { speedOf } from "./physics.ts";
 import { buildItemMesh, loadAlphaMask } from "./item-mesh.ts";
 import { backgroundPalette, boardTextures, itemTiers, randomlyRotated } from "./items.ts";
-import { blockMaterial } from "./materials.ts";
-import { itemMaterial } from "./materials.ts";
+import { blockMaterial, itemMaterial, silhouetteMaterial } from "./materials.ts";
 
 const RAIL_HEIGHT = 7;
 const RAIL_WIDTH = 8;
@@ -15,6 +15,12 @@ const AIM_LENGTH = 34;
 const HUD_TOP = 96;
 const HUD_BOTTOM = 92;
 const SHADE_HEIGHT = 0.09;
+/** the sun sits behind the camera, so shadows fall away from the player */
+const SUN_DIRECTION = new BABYLON.Vector3(0.55, -1, -0.5);
+/** where a standing item throws its shadow on the sand, per unit of height */
+const SHADE_DRIFT = new BABYLON.Vector2(SUN_DIRECTION.x / -SUN_DIRECTION.y, SUN_DIRECTION.z / -SUN_DIRECTION.y);
+const SHADE_LENGTH = SHADE_DRIFT.length();
+const SHADE_ANGLE = Math.atan2(SHADE_DRIFT.x, SHADE_DRIFT.y);
 /** floor tiles per noise cell: bigger means broader patches of the same block */
 const PATCH_CELL = 5.5;
 /** board space is x: 0..width, y: 0..height with the player side (high y) closest to the camera */
@@ -46,16 +52,11 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
     ambient.intensity = 0.7;
     ambient.groundColor = new BABYLON.Color3(0.42, 0.42, 0.48);
 
-    const sun = new BABYLON.DirectionalLight("sun", new BABYLON.Vector3(-0.5, -1, 0.7), scene);
-    sun.position = new BABYLON.Vector3(80, 170, -140);
+    const sun = new BABYLON.DirectionalLight("sun", SUN_DIRECTION.clone(), scene);
+    sun.position = new BABYLON.Vector3(-70, 170, 150);
     sun.intensity = 0.85;
 
     buildTray(scene);
-
-    // baked blob shadows instead of a shadow map: cheap on phones and free of shadow acne
-    const shade = BABYLON.MeshBuilder.CreateGround("shade", { width: 1, height: 1 }, scene);
-    shade.material = shadeMaterial(scene);
-    shade.isVisible = false;
 
     const masks = await Promise.all(itemTiers.map(tier => loadAlphaMask(tier.texture)));
     const templates = itemTiers.map((tier, index) => {
@@ -65,16 +66,35 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
         return mesh;
     });
 
-    const instances = new Map<number, { mesh: BABYLON.InstancedMesh; shade: BABYLON.InstancedMesh; }>();
-    const launcherShade = shade.createInstance("shade");
-    let launcherMesh: BABYLON.InstancedMesh | null = null;
+    // no shadow map: each item lays its own sprite down as a flat shadow, cheap and exact
+    const shades = itemTiers.map(tier => {
+        const size = tier.radius * 2;
+        const mesh = BABYLON.MeshBuilder.CreateGround(`shade:${tier.name}`, { width: size, height: size * SHADE_LENGTH }, scene);
+        mesh.material = silhouetteMaterial(tier.texture, scene);
+        mesh.rotation.y = SHADE_ANGLE;
+        mesh.isVisible = false;
+        return mesh;
+    });
+
+    interface Tracked {
+        mesh: BABYLON.InstancedMesh;
+        shade: BABYLON.InstancedMesh;
+        /** eased so the shadow stretches and settles instead of snapping */
+        stretch: number;
+    }
+    const instances = new Map<number, Tracked>();
+    const launcher: Tracked = { mesh: null!, shade: null!, stretch: 1 };
     let launcherTier = -1;
 
-    function placeShade(mesh: BABYLON.InstancedMesh, x: number, z: number, radius: number, lift: number) {
-        // the blob sits where the sun would throw it and fades as the item rises
-        mesh.position.set(x - radius * 0.34, SHADE_HEIGHT, z + radius * 0.42);
-        mesh.scaling.set(radius * 2.5, 1, radius * 2.9);
-        mesh.visibility = Math.max(0.25, 1 - lift / 14);
+    function placeShade(entry: Tracked, x: number, z: number, radius: number, lift: number, pop: number, speed: number, dt: number) {
+        // fast items smear their shadow, a merge pops it, height slides it away from the base
+        const target = 1 + Math.min(0.3, speed / 1200) + pop * 0.25;
+        entry.stretch += (target - entry.stretch) * Math.min(1, dt * 9);
+        const depth = radius * 2 * SHADE_LENGTH * entry.stretch;
+        const reach = depth / 2 + lift * SHADE_LENGTH;
+        const drift = SHADE_DRIFT.clone().normalize();
+        entry.shade.position.set(x + drift.x * reach, SHADE_HEIGHT, z + drift.y * reach);
+        entry.shade.scaling.set(1 + pop * 0.25, 1, entry.stretch);
     }
 
     const aim = BABYLON.MeshBuilder.CreateGround("aim", { width: 1.6, height: AIM_LENGTH }, scene);
@@ -112,11 +132,20 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
     }
     resize();
 
+    let lastTime = 0;
+
     function sync(state: GameState, time: number) {
+        const dt = Math.min(0.05, Math.max(0, time - lastTime));
+        lastTime = time;
+
         for (const item of state.items) {
             let entry = instances.get(item.id);
             if (!entry) {
-                entry = { mesh: templates[ item.tier ].createInstance("item"), shade: shade.createInstance("shade") };
+                entry = {
+                    mesh: templates[ item.tier ].createInstance("item"),
+                    shade: shades[ item.tier ].createInstance("shade"),
+                    stretch: 1,
+                };
                 instances.set(item.id, entry);
             }
             const radius = itemTiers[ item.tier ].radius;
@@ -126,7 +155,7 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
             entry.mesh.position.set(x, radius * scale + 0.6, z);
             entry.mesh.rotation.set(ITEM_LEAN, 0, 0);
             entry.mesh.scaling.setAll(scale);
-            placeShade(entry.shade, x, z, radius * scale, 0);
+            placeShade(entry, x, z, radius, 0, item.pop, speedOf(item), dt);
         }
         for (const [ id, entry ] of instances) {
             if (state.items.some(item => item.id === id)) continue;
@@ -137,18 +166,20 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
 
         const tier = state.queue[ 0 ];
         if (tier !== launcherTier) {
-            launcherMesh?.dispose();
-            launcherMesh = templates[ tier ].createInstance("launcher");
+            launcher.mesh?.dispose();
+            launcher.shade?.dispose();
+            launcher.mesh = templates[ tier ].createInstance("launcher");
+            launcher.shade = shades[ tier ].createInstance("shade");
             launcherTier = tier;
         }
         const spot = launcherPosition(state);
         const radius = itemTiers[ tier ].radius;
         const hover = state.drag ? 3 : 1 + Math.sin(time * 2.4) * 0.8;
-        launcherMesh!.position.set(toWorldX(spot.x), radius + hover, toWorldZ(spot.y));
-        launcherMesh!.rotation.set(ITEM_LEAN, 0, 0);
-        launcherMesh!.isVisible = !state.over;
-        launcherShade.isVisible = !state.over;
-        placeShade(launcherShade, toWorldX(spot.x), toWorldZ(spot.y), radius, hover);
+        launcher.mesh.position.set(toWorldX(spot.x), radius + hover, toWorldZ(spot.y));
+        launcher.mesh.rotation.set(ITEM_LEAN, 0, 0);
+        launcher.mesh.isVisible = !state.over;
+        launcher.shade.isVisible = !state.over;
+        placeShade(launcher, toWorldX(spot.x), toWorldZ(spot.y), radius, hover, 0, 0, dt);
 
         // a short guide line straight up the tray, shots never angle away from it
         aim.isVisible = state.drag !== null;
@@ -265,8 +296,8 @@ function traySurroundShadow(scene: BABYLON.Scene) {
         context.save();
         context.shadowColor = `rgba(0,0,0,${alpha})`;
         context.shadowBlur = blur * scale;
-        context.shadowOffsetX = -2 * scale;
-        context.shadowOffsetY = 4 * scale;
+        context.shadowOffsetX = 2 * scale;
+        context.shadowOffsetY = -4 * scale;
         context.fillStyle = "#000000";
         context.fillRect(inset, inset, boxWidth, boxHeight);
         context.restore();
@@ -287,30 +318,6 @@ function traySurroundShadow(scene: BABYLON.Scene) {
     mesh.position.set(0, -RAIL_DROP + 0.08, 0);
     mesh.material = material;
     return mesh;
-}
-
-/** soft round shadow blob, painted once at startup */
-function shadeMaterial(scene: BABYLON.Scene) {
-    const size = 128;
-    const texture = new BABYLON.DynamicTexture("shade", { width: size, height: size }, scene, true);
-    const context = texture.getContext();
-    const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    gradient.addColorStop(0, "rgba(0,0,0,0.5)");
-    gradient.addColorStop(0.5, "rgba(0,0,0,0.26)");
-    gradient.addColorStop(1, "rgba(0,0,0,0)");
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, size, size);
-    texture.update();
-    texture.hasAlpha = true;
-
-    const material = new BABYLON.StandardMaterial("shade", scene);
-    material.diffuseTexture = texture;
-    material.opacityTexture = texture;
-    material.diffuseColor = new BABYLON.Color3(0, 0, 0);
-    material.specularColor = new BABYLON.Color3(0, 0, 0);
-    material.disableLighting = true;
-    material.backFaceCulling = false;
-    return material;
 }
 
 /** stable per-tile noise, so the floor pattern is the same on every load */

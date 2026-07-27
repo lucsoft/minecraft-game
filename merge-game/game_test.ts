@@ -217,3 +217,10 @@ Deno.test("restarting clears the tray and the score", () => {
     assertFalse(state.over);
     assertEquals(state.orders.length, 3);
 });
+
+Deno.test("the three objectives of a round ask for different items", () => {
+    for (let attempt = 0; attempt < 200; attempt++) {
+        const tiers = createGame().orders.map(order => order.tier);
+        assertEquals(new Set(tiers).size, tiers.length);
+    }
+});

@@ -101,15 +101,21 @@ export function pickSpawnTier() {
     return 0;
 }
 
+/**
+ * The tiers a round can ask for: always three distinct ones above the spawn tiers, climbing
+ * with the rounds until they hit the top of the chain.
+ */
+function orderTiers(state: GameState) {
+    const top = Math.min(MAX_TIER, MAX_SPAWN_TIER + 3 + Math.floor((state.round - 1) / 3));
+    return [ top - 2, top - 1, top ];
+}
+
 /** orders always ask for something above the spawn tiers, so they have to be merged */
 function createOrder(state: GameState): Order {
-    const base = MAX_SPAWN_TIER + 1 + Math.floor((state.round - 1) / 3);
-    for (let attempt = 0; attempt < 6; attempt++) {
-        const tier = Math.min(MAX_TIER, base + Math.floor(Math.random() * 2));
-        if (state.orders.some(order => !order.done && order.tier === tier)) continue;
-        return { tier, reward: itemTiers[ tier ].coins * 3, done: false };
-    }
-    const tier = Math.min(MAX_TIER, base);
+    const taken = state.orders.filter(order => !order.done).map(order => order.tier);
+    const free = orderTiers(state).filter(tier => !taken.includes(tier));
+    const pool = free.length > 0 ? free : orderTiers(state);
+    const tier = pool[ Math.floor(Math.random() * pool.length) ];
     return { tier, reward: itemTiers[ tier ].coins * 3, done: false };
 }
 

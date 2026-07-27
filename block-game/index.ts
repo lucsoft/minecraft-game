@@ -4,9 +4,10 @@ import './assets.ts';
 import { assetState, getMinecraftMaterialFromName, loadAssets, minecraftBlockstates, normalizeName } from "./assets.ts";
 import { isEmptyModel, isSolidBlock } from "./bakeing.ts";
 import { setupCamera, setupCameraInput, tickCamera } from "./camera.ts";
+import { renderChunk } from "./chunk.ts";
 import { createEntity, setControlledEntity } from "./entities.ts";
 import { createSkyDome, tickSky } from "./sky.ts";
-import { computedChunks, range, rawChunks, renderChunk } from "./utils.ts";
+import { computedChunks, range, rawChunks } from "./utils.ts";
 import { Chunk, CHUNK_SIZE, debugMutateChunk, generateWorld, getIndexFromLocalBlock } from "./world.ts";
 
 const CHUNK_Y_BLOCK_OFFSET = 0 * CHUNK_SIZE;

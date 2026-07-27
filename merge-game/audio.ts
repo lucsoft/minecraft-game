@@ -2,12 +2,12 @@ import { soundFileUrl } from "../asset-pipeline-url.ts";
 
 /**
  * Minecraft's own sounds, pulled through the asset pipeline. Everything is kept quiet and
- * short so a long session stays pleasant: a light pop for a shot, an experience orb that
- * climbs with the tier for a merge, and a little bell chord when an order is served.
+ * short so a long session stays pleasant: a soft leather thud for a shot, an experience orb
+ * that climbs with the tier for a merge, and a little bell chord when an order is served.
  */
 const MASTER = 0.5;
 
-const THROW = "random/pop";
+const THROW = "item/armor/equip_leather4";
 const MERGE = "random/orb";
 const DELIVER = "note/bell";
 const DELIVER_CHORD = [ 1, 1.26, 1.5 ];

@@ -245,7 +245,7 @@ export function createHud(): Hud {
         <div class="floats" data-floats></div>
         <div class="flights" data-flights></div>
         <div class="panel dialog hidden" data-dialog>
-            <h1 data-reason>TRAY FULL</h1>
+            <h1>SERVING ZONE BLOCKED</h1>
             <p data-summary></p>
             <button type="button" data-restart>PLAY AGAIN</button>
         </div>
@@ -262,7 +262,6 @@ export function createHud(): Hud {
     const floatsEl = query<HTMLDivElement>("[data-floats]");
     const flightsEl = query<HTMLDivElement>("[data-flights]");
     const dialogEl = query<HTMLDivElement>("[data-dialog]");
-    const reasonEl = query<HTMLHeadingElement>("[data-reason]");
     const summaryEl = query<HTMLParagraphElement>("[data-summary]");
     const restartEl = query<HTMLButtonElement>("[data-restart]");
 
@@ -361,10 +360,7 @@ export function createHud(): Hud {
             });
 
             dialogEl.classList.toggle("hidden", !state.over);
-            if (state.over) {
-                reasonEl.textContent = state.reason === "capacity" ? "TRAY FULL" : "SERVING ZONE BLOCKED";
-                summaryEl.textContent = `${state.coins} coins · ${state.deliveries} orders served · round ${state.round}`;
-            }
+            if (state.over) summaryEl.textContent = `${state.coins} coins · ${state.deliveries} orders served · round ${state.round}`;
         },
         onRestart(handler) {
             restartEl.addEventListener("click", handler);

@@ -5,8 +5,7 @@ export const BOARD: Board = { width: 100, height: 176, lineY: 154 };
 /** resting spot of the item waiting to be flicked */
 export const LAUNCHER = { x: 50, y: 165 };
 
-/** the run ends when the serving zone clogs up, this is only a backstop against runaway trays */
-const MAX_ITEMS = 96;
+/** the one way to lose: this many items coming to rest in the serving zone */
 const MAX_SPILLED = 3;
 const LAUNCH_COOLDOWN = 0.28;
 /** fast enough that a shot carries all the way to the far rail */
@@ -68,8 +67,6 @@ export interface GameState {
     lastMergeTier: number;
     banner: { text: string; life: number; } | null;
     over: boolean;
-    /** why the run ended, so the dialog can name it */
-    reason: "spill" | "capacity" | null;
     cooldown: number;
     nextId: number;
 }
@@ -91,7 +88,6 @@ export function createGame(): GameState {
         lastMergeTier: 0,
         banner: null,
         over: false,
-        reason: null,
         cooldown: 0,
         nextId: 0,
     };
@@ -138,8 +134,7 @@ function fillOrders(state: GameState) {
 
 /** shots only wait for a short reload, items already sliding do not block the next one */
 export function isReady(state: GameState) {
-    if (state.over || state.cooldown > 0) return false;
-    return state.items.length < MAX_ITEMS;
+    return !state.over && state.cooldown <= 0;
 }
 
 /** where the next item currently sits: under the finger while sliding, on its spot otherwise */
@@ -216,14 +211,9 @@ export function updateGame(state: GameState, dt: number) {
     }
     state.items = state.items.filter(item => !item.merging);
 
+    // however busy the tray gets, only a blocked serving zone ends the run
     const spilled = state.items.filter(item => item.settled && item.y > BOARD.lineY).length;
-    if (spilled >= MAX_SPILLED) {
-        state.over = true;
-        state.reason = "spill";
-    } else if (state.items.length >= MAX_ITEMS) {
-        state.over = true;
-        state.reason = "capacity";
-    }
+    if (spilled >= MAX_SPILLED) state.over = true;
 }
 
 function merge(state: GameState, a: Item, b: Item) {

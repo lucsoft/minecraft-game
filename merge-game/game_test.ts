@@ -205,7 +205,6 @@ Deno.test("items left in the serving zone end the run", () => {
     for (const x of [ 20, 50, 80 ]) place(state, 0, x, BOARD.height - 20).settled = true;
     run(state, 0.2);
     assert(state.over);
-    assertEquals(state.reason, "spill");
 });
 
 Deno.test("a crowded tray is fine as long as the serving zone stays clear", () => {
@@ -219,6 +218,8 @@ Deno.test("a crowded tray is fine as long as the serving zone stays clear", () =
     assertGreater(state.items.length, 50);
     run(state, 0.5);
     assertFalse(state.over);
+    // and the launcher keeps loading, however many items are out there
+    assert(isReady(state));
 });
 
 Deno.test("two items may rest in the serving zone, a third ends the run", () => {
@@ -236,7 +237,6 @@ Deno.test("two items may rest in the serving zone, a third ends the run", () => 
     place(state, 0, 80, BOARD.height - 20).settled = true;
     run(state, 0.2);
     assert(state.over);
-    assertEquals(state.reason, "spill");
 });
 
 Deno.test("the game ignores input once it is over", () => {

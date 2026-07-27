@@ -4,6 +4,18 @@ import { textureFileUrl } from "../asset-pipeline-url.ts";
 const ALPHA_THRESHOLD = 8;
 /** how many texels deep an item is, vanilla dropped items are one */
 const THICKNESS_TEXELS = 2;
+const SHADOW_RESOLUTION = 64;
+/** penumbra in shadow-texture pixels: crisp where the item touches, soft at the far end */
+const SHADOW_BLUR_NEAR = 1;
+const SHADOW_BLUR_FAR = 7;
+const SHADOW_ALPHA_NEAR = 0.8;
+const SHADOW_ALPHA_FAR = 0.3;
+/** the blur thins the silhouette out, this puts the weight back without losing the gradient */
+const SHADOW_GAIN = 1.8;
+/** the penumbra fans out sideways as well, so the far end of the shadow is wider */
+const SHADOW_SPREAD = 1.35;
+/** margin around the sprite inside the shadow texture, so the blur has room to bleed */
+const SHADOW_PADDING = 0.2;
 
 export interface AlphaMask {
     width: number;
@@ -112,13 +124,20 @@ export function buildShadowMesh(name: string, size: number, lean: number, drift:
     const nearZ = -half * Math.sin(lean);
     const reachX = drift.x * height;
     const reachZ = half * Math.sin(lean) + drift.y * height - nearZ;
+    // the quad covers the padded texture, so the blurred edges are not clipped
+    const nearHalf = half + SHADOW_PADDING * size;
+    const farHalf = half * SHADOW_SPREAD + SHADOW_PADDING * size * SHADOW_SPREAD;
+    const nearOffsetX = -SHADOW_PADDING * reachX;
+    const nearOffsetZ = nearZ - SHADOW_PADDING * reachZ;
+    const farOffsetX = reachX * (1 + SHADOW_PADDING);
+    const farOffsetZ = nearZ + reachZ * (1 + SHADOW_PADDING);
     const mesh = new BABYLON.Mesh(`shade:${name}`, scene);
     const vertexData = new BABYLON.VertexData();
     vertexData.positions = [
-        -half, 0, nearZ,
-        half, 0, nearZ,
-        half + reachX, 0, nearZ + reachZ,
-        -half + reachX, 0, nearZ + reachZ,
+        nearOffsetX - nearHalf, 0, nearOffsetZ,
+        nearOffsetX + nearHalf, 0, nearOffsetZ,
+        farOffsetX + farHalf, 0, farOffsetZ,
+        farOffsetX - farHalf, 0, farOffsetZ,
     ];
     vertexData.normals = [ 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0 ];
     // u mirrored like the item faces, v running from the base of the sprite to its top
@@ -126,4 +145,73 @@ export function buildShadowMesh(name: string, size: number, lean: number, drift:
     vertexData.indices = [ 0, 1, 2, 0, 2, 3 ];
     vertexData.applyToMesh(mesh);
     return mesh;
+}
+
+/**
+ * Bakes the item silhouette into a shadow texture whose blur and darkness follow the distance
+ * from the item's feet, the way a real penumbra spreads the further the shadow is thrown.
+ */
+export function buildShadowTexture(name: string, mask: AlphaMask, scene: BABYLON.Scene) {
+    const size = SHADOW_RESOLUTION;
+    const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
+    // texture space includes a margin, this maps it back onto the sprite
+    const spriteAt = (pixel: number) => ((pixel + 0.5) / size - SHADOW_PADDING) / (1 - 2 * SHADOW_PADDING);
+    // the top of the sprite lands furthest from the item, its feet touch the ground
+    const distanceOf = (row: number) => Math.min(1, Math.max(0, 1 - spriteAt(row)));
+
+    const coverage = new Float32Array(size * size);
+    for (let row = 0; row < size; row++) {
+        const spriteRow = spriteAt(row);
+        if (spriteRow < 0 || spriteRow >= 1) continue;
+        const maskRow = Math.floor(spriteRow * mask.height);
+        for (let col = 0; col < size; col++) {
+            const spriteCol = spriteAt(col);
+            if (spriteCol < 0 || spriteCol >= 1) continue;
+            const maskCol = Math.floor(spriteCol * mask.width);
+            coverage[ row * size + col ] = mask.alpha[ maskRow * mask.width + maskCol ] > ALPHA_THRESHOLD ? 1 : 0;
+        }
+    }
+
+    const radiusOf = (row: number) => Math.round(lerp(SHADOW_BLUR_NEAR, SHADOW_BLUR_FAR, distanceOf(row)));
+    const blurred = new Float32Array(size * size);
+    const spread = new Float32Array(size * size);
+    for (let row = 0; row < size; row++) {
+        const radius = radiusOf(row);
+        for (let col = 0; col < size; col++) {
+            let total = 0;
+            for (let step = -radius; step <= radius; step++) {
+                const sample = Math.min(size - 1, Math.max(0, col + step));
+                total += coverage[ row * size + sample ];
+            }
+            spread[ row * size + col ] = total / (radius * 2 + 1);
+        }
+    }
+    for (let row = 0; row < size; row++) {
+        const radius = radiusOf(row);
+        for (let col = 0; col < size; col++) {
+            let total = 0;
+            for (let step = -radius; step <= radius; step++) {
+                const sample = Math.min(size - 1, Math.max(0, row + step));
+                total += spread[ sample * size + col ];
+            }
+            blurred[ row * size + col ] = total / (radius * 2 + 1);
+        }
+    }
+
+    const texture = new BABYLON.DynamicTexture(`shade:${name}`, { width: size, height: size }, scene, true);
+    const context = texture.getContext() as unknown as CanvasRenderingContext2D;
+    const image = context.createImageData(size, size);
+    for (let row = 0; row < size; row++) {
+        const strength = lerp(SHADOW_ALPHA_NEAR, SHADOW_ALPHA_FAR, distanceOf(row));
+        for (let col = 0; col < size; col++) {
+            const index = (row * size + col) * 4;
+            const value = Math.min(1, blurred[ row * size + col ] * SHADOW_GAIN);
+            image.data[ index + 3 ] = Math.round(value * strength * 255);
+        }
+    }
+    context.putImageData(image, 0, 0);
+    // same orientation as the item textures: uv v 0 is the bottom of the sprite, its feet
+    texture.update(true);
+    texture.hasAlpha = true;
+    return texture;
 }

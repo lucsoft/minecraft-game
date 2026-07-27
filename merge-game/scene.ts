@@ -1,7 +1,7 @@
 import * as BABYLON from "@babylonjs/core";
 import { BOARD, GameState, launcherPosition } from "./game.ts";
 import { speedOf } from "./physics.ts";
-import { buildItemMesh, buildShadowMesh, loadAlphaMask } from "./item-mesh.ts";
+import { buildItemMesh, buildShadowMesh, buildShadowTexture, loadAlphaMask } from "./item-mesh.ts";
 import { backgroundPalette, boardTextures, itemTiers, randomlyRotated } from "./items.ts";
 import { blockMaterial, itemMaterial, silhouetteMaterial } from "./materials.ts";
 
@@ -18,7 +18,7 @@ const HUD_TOP = 96;
 const HUD_BOTTOM = 92;
 const SHADE_HEIGHT = 0.09;
 /** the sun sits behind the camera, so shadows fall away from the player */
-const SUN_DIRECTION = new BABYLON.Vector3(0.55, -1, -0.5);
+const SUN_DIRECTION = new BABYLON.Vector3(0.3, -1, -1.05);
 /** where the sun pushes the top of a standing item, per unit of its height */
 const SHADE_DRIFT = new BABYLON.Vector2(SUN_DIRECTION.x / -SUN_DIRECTION.y, SUN_DIRECTION.z / -SUN_DIRECTION.y);
 /** floor tiles per noise cell: bigger means broader patches of the same block */
@@ -67,9 +67,9 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
     });
 
     // no shadow map: each item lays its own sprite down as a flat shadow, cheap and exact
-    const shades = itemTiers.map(tier => {
+    const shades = itemTiers.map((tier, index) => {
         const mesh = buildShadowMesh(tier.texture, tier.radius * 2, ITEM_LEAN, SHADE_DRIFT, scene);
-        mesh.material = silhouetteMaterial(tier.texture, scene);
+        mesh.material = silhouetteMaterial(tier.texture, buildShadowTexture(tier.texture, masks[ index ], scene), scene);
         mesh.isVisible = false;
         return mesh;
     });

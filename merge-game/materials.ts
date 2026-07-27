@@ -17,17 +17,14 @@ export function blockMaterial(name: string, scene: BABYLON.Scene, uTiles: number
     return material;
 }
 
-/** the item sprite as a flat black shape, used as its shadow on the sand */
-export function silhouetteMaterial(name: string, scene: BABYLON.Scene) {
+/** flat black shadow, shaped and softened by a pre-baked silhouette texture */
+export function silhouetteMaterial(name: string, texture: BABYLON.BaseTexture, scene: BABYLON.Scene) {
     const material = new BABYLON.StandardMaterial(`shade:${name}`, scene);
-    const texture = pixelTexture(name, scene);
-    texture.hasAlpha = true;
     material.opacityTexture = texture;
     material.diffuseColor = new BABYLON.Color3(0, 0, 0);
     material.specularColor = new BABYLON.Color3(0, 0, 0);
     material.emissiveColor = new BABYLON.Color3(0, 0, 0);
     material.disableLighting = true;
-    material.alpha = 0.5;
     material.backFaceCulling = false;
     return material;
 }

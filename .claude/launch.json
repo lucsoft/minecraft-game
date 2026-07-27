@@ -1,0 +1,11 @@
+{
+    "version": "0.0.1",
+    "configurations": [
+        {
+            "name": "vite",
+            "runtimeExecutable": "deno",
+            "runtimeArgs": [ "run", "-A", "vite" ],
+            "port": 5173
+        }
+    ]
+}

@@ -38,15 +38,10 @@ export const boardTextures = {
  */
 export const backgroundPalette = [
     "block/andesite",
-    "block/polished_andesite",
     "block/cobblestone",
     "block/stone",
-    "block/chiseled_stone_bricks",
     "block/furnace_top",
-    "block/coal_ore",
-    "block/observer_top",
     "block/polished_basalt_top",
-    "block/gray_glazed_terracotta",
     "block/bedrock",
     "block/deepslate_top",
     "block/basalt_top",

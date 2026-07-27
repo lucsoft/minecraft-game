@@ -3,16 +3,15 @@ import { BOARD, GameState, launcherPosition } from "./game.ts";
 import { speedOf } from "./physics.ts";
 import { buildItemMesh, buildShadowMesh, loadAlphaMask } from "./item-mesh.ts";
 import { backgroundPalette, boardTextures, itemTiers, randomlyRotated } from "./items.ts";
-import { blockMaterial, contactMaterial, itemMaterial, silhouetteMaterial } from "./materials.ts";
+import { blockMaterial, itemMaterial, silhouetteMaterial } from "./materials.ts";
 
 const RAIL_HEIGHT = 7;
 const RAIL_WIDTH = 8;
 const RAIL_DROP = 9;
 const CAMERA_PITCH = 1.02;
 const ITEM_LEAN = -0.55;
-/** a leaning sprite stands a little lower and tips its bottom edge towards the camera */
+/** a leaning sprite stands a little lower than its half size */
 const LEAN_HEIGHT = Math.cos(ITEM_LEAN);
-const LEAN_FOOT = -Math.sin(ITEM_LEAN);
 const AIM_LENGTH = 34;
 /** screen space kept clear of the tray so the hud never covers it, in css pixels */
 const HUD_TOP = 96;
@@ -75,32 +74,22 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
         return mesh;
     });
 
-    const contact = BABYLON.MeshBuilder.CreateGround("contact", { width: 1, height: 1 }, scene);
-    contact.material = contactMaterial(scene);
-    contact.isVisible = false;
-
     interface Tracked {
         mesh: BABYLON.InstancedMesh;
         shade: BABYLON.InstancedMesh;
-        contact: BABYLON.InstancedMesh;
         /** eased so the shadow stretches and settles instead of snapping */
         stretch: number;
     }
     const instances = new Map<number, Tracked>();
-    const launcher: Tracked = { mesh: null!, shade: null!, contact: contact.createInstance("contact"), stretch: 1 };
+    const launcher: Tracked = { mesh: null!, shade: null!, stretch: 1 };
     let launcherTier = -1;
 
-    function placeShade(entry: Tracked, x: number, z: number, radius: number, lift: number, pop: number, speed: number, dt: number) {
+    function placeShade(entry: Tracked, x: number, z: number, lift: number, pop: number, speed: number, dt: number) {
         // fast items smear their shadow, a merge pops it, and lifting slides it off the base
         const target = 1 + Math.min(0.3, speed / 1200) + pop * 0.25;
         entry.stretch += (target - entry.stretch) * Math.min(1, dt * 9);
         entry.shade.position.set(x + SHADE_DRIFT.x * lift, SHADE_HEIGHT, z + SHADE_DRIFT.y * lift);
         entry.shade.scaling.set(1 + pop * 0.2, 1, entry.stretch);
-
-        // the item touches the sand a bit in front of its centre, that is where it grounds
-        const spread = 1 + pop * 0.2 - Math.min(0.3, lift / 12);
-        entry.contact.position.set(x, SHADE_HEIGHT - 0.02, z + radius * LEAN_FOOT * 0.65);
-        entry.contact.scaling.set(radius * 1.9 * spread, 1, radius * 1.35 * spread);
     }
 
     const aim = BABYLON.MeshBuilder.CreateGround("aim", { width: 1.6, height: AIM_LENGTH }, scene);
@@ -150,7 +139,6 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
                 entry = {
                     mesh: templates[ item.tier ].createInstance("item"),
                     shade: shades[ item.tier ].createInstance("shade"),
-                    contact: contact.createInstance("contact"),
                     stretch: 1,
                 };
                 instances.set(item.id, entry);
@@ -162,13 +150,12 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
             entry.mesh.position.set(x, radius * LEAN_HEIGHT * scale, z);
             entry.mesh.rotation.set(ITEM_LEAN, 0, 0);
             entry.mesh.scaling.setAll(scale);
-            placeShade(entry, x, z, radius * scale, 0, item.pop, speedOf(item), dt);
+            placeShade(entry, x, z, 0, item.pop, speedOf(item), dt);
         }
         for (const [ id, entry ] of instances) {
             if (state.items.some(item => item.id === id)) continue;
             entry.mesh.dispose();
             entry.shade.dispose();
-            entry.contact.dispose();
             instances.delete(id);
         }
 
@@ -187,8 +174,7 @@ export async function createStage(canvas: HTMLCanvasElement): Promise<Stage> {
         launcher.mesh.rotation.set(ITEM_LEAN, 0, 0);
         launcher.mesh.isVisible = !state.over;
         launcher.shade.isVisible = !state.over;
-        launcher.contact.isVisible = !state.over;
-        placeShade(launcher, toWorldX(spot.x), toWorldZ(spot.y), radius, hover, 0, 0, dt);
+        placeShade(launcher, toWorldX(spot.x), toWorldZ(spot.y), hover, 0, 0, dt);
 
         // a short guide line straight up the tray, shots never angle away from it
         aim.isVisible = state.drag !== null;
